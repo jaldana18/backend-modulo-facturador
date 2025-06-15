@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int     @id @default(autoincrement())
+  userName  String  @unique
+  email     String  @unique
+  password  String
+  company   Company @relation(fields: [companyId], references: [id])
+  companyId Int
+}
+
+model Company {
+  id                 Int                 @id @default(autoincrement())
+  name               String
+  users              User[]
+  products           Product[]
+  invoices           Invoice[]
+  categories         Category[]
+  inventory          Inventory[]
+  inventoryMovements InventoryMovement[]
+  payments           Payment[]
+}
+
+model Product {
+  id          Int                 @id @default(autoincrement())
+  name        String
+  description String?
+  price       Float
+  company     Company             @relation(fields: [companyId], references: [id])
+  companyId   Int
+  inventory   Inventory?
+  category    Category?           @relation(fields: [categoryId], references: [id])
+  categoryId  Int?
+  items       InvoiceItem[]
+  movements   InventoryMovement[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+model Inventory {
+  id        Int      @id @default(autoincrement())
+  quantity  Int
+  minStock  Int?
+  product   Product  @relation(fields: [productId], references: [id])
+  productId Int      @unique
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  companyId Int
+  updatedAt DateTime @updatedAt
+}
+
+model InvoiceItem {
+  id        Int     @id @default(autoincrement())
+  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+  invoiceId Int
+  product   Product @relation(fields: [productId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  productId Int
+  quantity  Int
+  price     Float
+}
+
+model Invoice {
+  id        Int      @id @default(autoincrement())
+  company   Company  @relation(fields: [companyId], references: [id])
+  companyId Int
+  customer  String
+  issuedAt  DateTime @default(now())
+  total     Float
+  status    String // "pending", "paid", "cancelled", etc.
+
+  items    InvoiceItem[]
+  payments Payment[]
+}
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String
+  company   Company   @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  companyId Int
+  products  Product[]
+}
+
+model Payment {
+  id        Int      @id @default(autoincrement())
+  method    String
+  amount    Float
+  paidAt    DateTime @default(now())
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+  invoiceId Int
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  companyId Int
+}
+
+model InventoryMovement {
+  id        Int      @id @default(autoincrement())
+  type      String
+  quantity  Int
+  reason    String?
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id])
+  productId Int
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  companyId Int
+}
