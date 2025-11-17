@@ -19,6 +19,31 @@ export class BulkUploadInventoryDto {
   @MaxLength(100, { message: 'SKU no puede exceder 100 caracteres' })
   sku: string;
 
+  // Campos opcionales para auto-creación de productos
+  @IsString()
+  @IsOptional()
+  @MaxLength(300, { message: 'Nombre no puede exceder 300 caracteres' })
+  productName?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(100, { message: 'Categoría no puede exceder 100 caracteres' })
+  category?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(50, { message: 'Unidad de medida no puede exceder 50 caracteres' })
+  unitOfMeasure?: string;
+
+  @IsNumber({}, { message: 'Precio de venta debe ser un número' })
+  @IsOptional()
+  @Min(0, { message: 'Precio de venta no puede ser negativo' })
+  salePrice?: number;
+
+  @IsString()
+  @IsOptional()
+  description?: string;
+
   @IsNumber({}, { message: 'Cantidad debe ser un número' })
   @Min(0.01, { message: 'Cantidad debe ser mayor a 0' })
   quantity: number;
@@ -66,6 +91,16 @@ export class BulkUploadInventoryDto {
 }
 
 /**
+ * Options for bulk inventory upload
+ */
+export interface BulkInventoryUploadOptions {
+  skipErrors?: boolean;
+  dryRun?: boolean;
+  defaultWarehouseCode?: string;
+  autoCreateProducts?: boolean; // Auto-create products that don't exist
+}
+
+/**
  * Result of bulk inventory upload operation
  */
 export interface BulkInventoryUploadResult {
@@ -80,11 +115,17 @@ export interface BulkInventoryUploadResult {
     batchNumber: string;
     transactionId: number;
   }>;
+  createdProducts?: Array<{
+    sku: string;
+    name: string;
+    productId: number;
+  }>;
   summary: {
     totalQuantity: number;
     totalCost: number;
     productsAffected: number;
     batchesCreated: number;
+    productsCreated?: number;
   };
 }
 

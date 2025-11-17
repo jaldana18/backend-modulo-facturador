@@ -36,6 +36,10 @@
  *               defaultWarehouseCode:
  *                 type: string
  *                 description: Default warehouse code to use if not specified in rows
+ *               autoCreateProducts:
+ *                 type: boolean
+ *                 default: true
+ *                 description: Automatically create products that don't exist (requires product name in Excel)
  *     responses:
  *       200:
  *         description: Upload completed successfully or with partial errors
@@ -223,6 +227,21 @@
  *             batchesCreated:
  *               type: integer
  *               description: Number of batches created
+ *             productsCreated:
+ *               type: integer
+ *               description: Number of products auto-created
+ *         createdProducts:
+ *           type: array
+ *           description: List of products that were auto-created
+ *           items:
+ *             type: object
+ *             properties:
+ *               sku:
+ *                 type: string
+ *               name:
+ *                 type: string
+ *               productId:
+ *                 type: integer
  *     BulkInventoryUploadError:
  *       type: object
  *       properties:

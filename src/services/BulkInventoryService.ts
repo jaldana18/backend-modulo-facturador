@@ -44,6 +44,7 @@ export class BulkInventoryService {
       skipErrors = true,
       dryRun = false,
       defaultWarehouseCode,
+      autoCreateProducts = true, // Default to true for better UX
     } = options;
 
     // Parse Excel file
@@ -70,11 +71,13 @@ export class BulkInventoryService {
       errorCount: 0,
       errors: [],
       createdTransactions: [],
+      createdProducts: [],
       summary: {
         totalQuantity: 0,
         totalCost: 0,
         productsAffected: 0,
         batchesCreated: 0,
+        productsCreated: 0,
       },
     };
 
@@ -127,19 +130,70 @@ export class BulkInventoryService {
           continue;
         }
 
-        // Find product
-        const product = productMap.get(dto.sku.toLowerCase());
+        // Find or create product
+        let product = productMap.get(dto.sku.toLowerCase());
+        
         if (!product) {
-          result.errors.push({
-            row: rowNumber,
-            sku: dto.sku,
-            message: `Producto con SKU '${dto.sku}' no existe. Debe crear el producto primero.`,
-          });
-          result.errorCount++;
-          if (!skipErrors) {
-            break;
+          // Auto-create product if enabled and data is provided
+          if (autoCreateProducts && dto.productName) {
+            if (!dryRun) {
+              // Create new product
+              const newProduct = this.productRepository.create({
+                companyId,
+                sku: dto.sku,
+                name: dto.productName,
+                description: dto.description || null,
+                category: dto.category || null,
+                unitOfMeasure: dto.unitOfMeasure || 'unidad',
+                cost: dto.unitCost,
+                price: dto.salePrice || dto.unitCost * 1.3, // Default 30% markup if no price provided
+                minimumStock: 0,
+                reorderPoint: 0,
+                isActive: true,
+              });
+
+              product = await this.productRepository.save(newProduct);
+              
+              // Add to map for subsequent rows with same SKU
+              productMap.set(dto.sku.toLowerCase(), product);
+              
+              // Track created product
+              result.createdProducts!.push({
+                sku: product.sku,
+                name: product.name,
+                productId: product.id,
+              });
+              result.summary.productsCreated!++;
+            } else {
+              // In dry-run, simulate product creation
+              result.createdProducts!.push({
+                sku: dto.sku,
+                name: dto.productName,
+                productId: -1, // Placeholder for dry-run
+              });
+              result.summary.productsCreated!++;
+              
+              // Continue validation even in dry-run
+              processedProducts.add(-1);
+              result.successCount++;
+              result.summary.totalQuantity += dto.quantity;
+              result.summary.totalCost += dto.quantity * dto.unitCost;
+              continue;
+            }
+          } else {
+            // Product doesn't exist and auto-create is disabled or no name provided
+            const missingInfo = !dto.productName ? ' Falta el nombre del producto.' : '';
+            result.errors.push({
+              row: rowNumber,
+              sku: dto.sku,
+              message: `Producto con SKU '${dto.sku}' no existe.${autoCreateProducts ? missingInfo : ' Debe crear el producto primero o habilitar autoCreateProducts.'}`,
+            });
+            result.errorCount++;
+            if (!skipErrors) {
+              break;
+            }
+            continue;
           }
-          continue;
         }
 
         // Find warehouse
@@ -257,6 +311,33 @@ export class BulkInventoryService {
   private mapExcelRowToDto(row: any, rowNumber: number): BulkUploadInventoryDto {
     const dto = plainToClass(BulkUploadInventoryDto, {
       sku: this.getColumnValue(row, ['sku', 'SKU', 'código', 'codigo']),
+      productName: this.getColumnValue(row, [
+        'productName',
+        'product_name',
+        'nombre',
+        'nombre del producto',
+        'producto',
+        'name',
+      ]),
+      category: this.getColumnValue(row, ['category', 'categoría', 'categoria']),
+      unitOfMeasure: this.getColumnValue(row, [
+        'unitOfMeasure',
+        'unit_of_measure',
+        'unidad de medida',
+        'unidad',
+        'uom',
+      ]),
+      salePrice: this.parseNumber(
+        this.getColumnValue(row, [
+          'salePrice',
+          'sale_price',
+          'precio de venta',
+          'precio venta',
+          'precio',
+          'price',
+        ])
+      ),
+      description: this.getColumnValue(row, ['description', 'descripción', 'descripcion']),
       quantity: this.parseNumber(
         this.getColumnValue(row, ['quantity', 'cantidad', 'qty'])
       ),
@@ -354,9 +435,14 @@ export class BulkInventoryService {
   generateTemplate(): Buffer {
     const wb = XLSX.utils.book_new();
 
-    // Define headers
+    // Define headers with new product fields
     const headers = [
       'SKU',
+      'Nombre Producto',
+      'Categoría',
+      'Unidad de Medida',
+      'Precio de Venta',
+      'Descripción',
       'Cantidad',
       'Costo Unitario',
       'Número de Lote',
@@ -368,10 +454,15 @@ export class BulkInventoryService {
       'Notas',
     ];
 
-    // Sample data
+    // Sample data with product information
     const sampleData = [
       [
         'PROD-001',
+        'Producto Ejemplo 1',
+        'Electrónica',
+        'unidad',
+        75000,
+        'Producto de ejemplo para carga masiva',
         100,
         50000,
         'LOTE-2025-001',
@@ -384,6 +475,11 @@ export class BulkInventoryService {
       ],
       [
         'PROD-002',
+        'Producto Ejemplo 2',
+        'Hogar',
+        'caja',
+        180000,
+        '',
         50,
         120000,
         'LOTE-2025-002',
@@ -399,8 +495,14 @@ export class BulkInventoryService {
     const wsData = [headers, ...sampleData];
     const ws = XLSX.utils.aoa_to_sheet(wsData);
 
+    // Adjust column widths for better readability
     ws['!cols'] = [
       { wch: 15 }, // SKU
+      { wch: 25 }, // Nombre Producto
+      { wch: 15 }, // Categoría
+      { wch: 18 }, // Unidad de Medida
+      { wch: 18 }, // Precio de Venta
+      { wch: 30 }, // Descripción
       { wch: 12 }, // Cantidad
       { wch: 15 }, // Costo Unitario
       { wch: 18 }, // Número de Lote

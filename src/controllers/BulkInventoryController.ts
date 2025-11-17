@@ -29,6 +29,7 @@ export class BulkInventoryController {
       skipErrors: req.body.skipErrors !== 'false' && req.body.skipErrors !== false,
       dryRun: req.body.dryRun === 'true' || req.body.dryRun === true,
       defaultWarehouseCode: req.body.defaultWarehouseCode || undefined,
+      autoCreateProducts: req.body.autoCreateProducts !== 'false' && req.body.autoCreateProducts !== false, // Default true
     };
 
     const result = await this.bulkInventoryService.processExcelUpload(
@@ -42,12 +43,23 @@ export class BulkInventoryController {
     const hasSuccess = result.successCount > 0;
 
     let message: string;
+    const productsCreated = result.summary.productsCreated || 0;
+    
     if (options.dryRun) {
       message = `Validación completada: ${result.successCount} filas válidas, ${result.errorCount} con errores`;
+      if (productsCreated > 0) {
+        message += `, ${productsCreated} productos serían creados`;
+      }
     } else if (!hasErrors) {
       message = `Carga completada exitosamente: ${result.createdTransactions.length} entradas registradas, ${result.summary.batchesCreated} lotes creados`;
+      if (productsCreated > 0) {
+        message += `, ${productsCreated} productos creados`;
+      }
     } else if (hasSuccess) {
       message = `Carga parcialmente exitosa: ${result.successCount} procesados, ${result.errorCount} con errores`;
+      if (productsCreated > 0) {
+        message += `, ${productsCreated} productos creados`;
+      }
     } else {
       message = `Carga fallida: todas las filas contienen errores`;
     }
@@ -130,6 +142,7 @@ export class BulkInventoryController {
       skipErrors: true,
       dryRun: true, // Always dry run for preview
       defaultWarehouseCode: req.body.defaultWarehouseCode || undefined,
+      autoCreateProducts: req.body.autoCreateProducts !== 'false' && req.body.autoCreateProducts !== false,
     };
 
     const result = await this.bulkInventoryService.processExcelUpload(
@@ -150,7 +163,9 @@ export class BulkInventoryController {
           totalQuantity: result.summary.totalQuantity,
           totalCost: result.summary.totalCost,
           productsAffected: result.summary.productsAffected,
+          productsToCreate: result.summary.productsCreated || 0,
         },
+        createdProducts: result.createdProducts || [],
         errors: result.errors,
       },
     });

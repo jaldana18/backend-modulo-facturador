@@ -25,6 +25,7 @@ Content-Type: multipart/form-data
 - `skipErrors` (optional): `true|false` - Continuar aunque haya errores (default: true)
 - `dryRun` (optional): `true|false` - Solo validar sin guardar (default: false)
 - `defaultWarehouseCode` (optional): Código del almacén por defecto
+- `autoCreateProducts` (optional): `true|false` - Crear automáticamente productos que no existen (default: true)
 
 **Response 200:**
 ```json
@@ -102,11 +103,16 @@ Descarga una plantilla Excel con las columnas correctas y datos de ejemplo.
 
 ## 📊 Formato del Archivo Excel
 
-### Columnas Requeridas
+### Columnas Disponibles
 
 | Columna | Descripción | Tipo | Obligatorio | Ejemplo |
 |---------|-------------|------|-------------|---------|
 | **SKU** | Código único del producto | Texto | ✅ | `PROD-001` |
+| **Nombre Producto** | Nombre del producto (si no existe) | Texto | ⚠️ * | `Laptop Dell XPS 15` |
+| **Categoría** | Categoría del producto (si no existe) | Texto | ❌ | `Electrónica` |
+| **Unidad de Medida** | Unidad (si no existe) | Texto | ❌ | `unidad`, `caja`, `kg` |
+| **Precio de Venta** | Precio de venta (si no existe) | Número | ❌ | `75.00` |
+| **Descripción** | Descripción del producto (si no existe) | Texto | ❌ | `Laptop para desarrollo` |
 | **Cantidad** | Cantidad a ingresar | Número | ✅ | `100` |
 | **Costo Unitario** | Precio de compra por unidad | Número | ✅ | `50.00` |
 | **Código Almacén** | Código del almacén destino | Texto | ❌ | `WH-01` |
@@ -116,13 +122,15 @@ Descarga una plantilla Excel con las columnas correctas y datos de ejemplo.
 | **Referencia** | # Factura u orden de compra | Texto | ❌ | `FC-001234` |
 | **Notas** | Observaciones adicionales | Texto | ❌ | `Producto nuevo` |
 
+**⚠️ \*** Obligatorio solo si `autoCreateProducts=true` y el producto no existe
+
 ### Ejemplo de Datos
 
-| SKU | Cantidad | Costo Unitario | Código Almacén | Fecha Vencimiento | Lote | Ubicación | Referencia | Notas |
-|-----|----------|----------------|----------------|-------------------|------|-----------|------------|-------|
-| PROD-001 | 100 | 50.00 | WH-01 | 2025-12-31 | LOT-001 | A-15-B | FC-001234 | Primera compra |
-| PROD-002 | 50 | 75.50 | WH-01 | 2026-06-30 | LOT-002 | A-16-A | FC-001234 | |
-| PROD-003 | 200 | 25.00 | | | | B-10-C | FC-001235 | Sin fecha vencimiento |
+| SKU | Nombre Producto | Categoría | Unidad de Medida | Precio de Venta | Descripción | Cantidad | Costo Unitario | Código Almacén | Fecha Vencimiento | Lote | Ubicación | Referencia | Notas |
+|-----|-----------------|-----------|------------------|-----------------|-------------|----------|----------------|----------------|-------------------|------|-----------|------------|-------|
+| PROD-001 | Laptop Dell XPS | Electrónica | unidad | 2500000 | Laptop profesional | 10 | 2000000 | WH-01 | | LOT-001 | A-15-B | FC-001234 | Producto nuevo |
+| PROD-002 | Mouse Logitech | Electrónica | unidad | 45000 | Mouse inalámbrico | 50 | 30000 | WH-01 | | LOT-002 | A-16-A | FC-001234 | |
+| PROD-003 | Cable HDMI | Accesorios | unidad | 25000 | | 200 | 15000 | | | | B-10-C | FC-001235 | |
 
 ---
 
@@ -148,6 +156,17 @@ Descarga una plantilla Excel con las columnas correctas y datos de ejemplo.
 ---
 
 ## ⚙️ Opciones de Configuración
+
+### autoCreateProducts
+
+- **`true`** (default): Crea automáticamente productos que no existen
+- **`false`**: Requiere que todos los productos existan previamente
+
+**Cuándo usar cada opción:**
+- `autoCreateProducts: true` → **Recomendado**. Carga inventario y crea productos en un solo paso
+- `autoCreateProducts: false` → Cuando quieres asegurar que solo se cargue inventario de productos previamente registrados
+
+**⚠️ Importante:** Si `autoCreateProducts=true` y el producto no existe, el campo **Nombre Producto** es obligatorio.
 
 ### skipErrors
 
@@ -196,7 +215,23 @@ El sistema valida automáticamente:
 
 Por cada fila válida del Excel, el sistema crea:
 
-### 1. Transacción de Inventario
+### 1. Producto (si no existe y autoCreateProducts=true)
+```typescript
+{
+  sku: <SKU del Excel>,
+  name: <Nombre Producto>,
+  category: <Categoría o null>,
+  unitOfMeasure: <Unidad de Medida o "unidad">,
+  cost: <Costo Unitario>,
+  price: <Precio de Venta o costo * 1.3>, // 30% markup por defecto
+  description: <Descripción o null>,
+  minimumStock: 0,
+  reorderPoint: 0,
+  isActive: true
+}
+```
+
+### 2. Transacción de Inventario
 ```typescript
 {
   type: "INBOUND",
@@ -212,7 +247,23 @@ Por cada fila válida del Excel, el sistema crea:
 }
 ```
 
-### 2. Batch (Lote)
+### 2. Transacción de Inventario
+```typescript
+{
+  type: "INBOUND",
+  reason: "PURCHASE",
+  productId: <id del producto>,
+  warehouseId: <id del almacén>,
+  quantity: <cantidad>,
+  unitCost: <costo unitario>,
+  totalCost: <cantidad * costo>,
+  reference: <referencia>,
+  location: <ubicación>,
+  notes: <notas>
+}
+```
+
+### 3. Batch (Lote)
 ```typescript
 {
   batchNumber: "BATCH-20250116-001", // Generado automáticamente
@@ -238,6 +289,7 @@ curl -X POST "http://localhost:3000/api/v1/inventory/bulk/upload" \
   -F "file=@/path/to/inventory.xlsx" \
   -F "skipErrors=true" \
   -F "dryRun=false" \
+  -F "autoCreateProducts=true" \
   -F "defaultWarehouseCode=WH-01"
 ```
 
