@@ -147,6 +147,26 @@ router.get('/reports/totals', inventoryController.getTotalsByType);
  * @route   POST /api/v1/inventory/adjust
  * @desc    Adjust stock to a specific value
  * @access  Private (admin, manager, user)
+ * @swagger
+ * /inventory/adjust:
+ *   post:
+ *     summary: Adjust stock to specific value
+ *     tags: [Inventory]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/AdjustStockRequest'
+ *     responses:
+ *       201:
+ *         description: Stock adjusted successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         description: Warehouse access denied (for users restricted to specific warehouse)
  */
 router.post('/adjust', requireRole('admin', 'manager', 'user'), warehouseFilterMiddleware, inventoryController.adjustStock);
 
@@ -154,6 +174,39 @@ router.post('/adjust', requireRole('admin', 'manager', 'user'), warehouseFilterM
  * @route   POST /api/v1/inventory/bulk/inbound
  * @desc    Create multiple inbound transactions
  * @access  Private (admin, manager, user)
+ * @swagger
+ * /inventory/bulk/inbound:
+ *   post:
+ *     summary: Create multiple inbound transactions (REQUIRES warehouseId)
+ *     tags: [Inventory]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/BulkTransactionRequest'
+ *           example:
+ *             warehouseId: 2
+ *             items:
+ *               - productId: 1
+ *                 quantity: 100
+ *                 unitCost: 15.50
+ *                 reference: "FAC-001"
+ *               - productId: 2
+ *                 quantity: 50
+ *                 unitCost: 25.00
+ *                 reference: "FAC-001"
+ *             reason: "purchase"
+ *             notes: "Compra masiva proveedor XYZ"
+ *     responses:
+ *       201:
+ *         description: Bulk inbound transactions created successfully
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         description: Warehouse access denied
  */
 router.post('/bulk/inbound', requireRole('admin', 'manager', 'user'), warehouseFilterMiddleware, inventoryController.bulkInbound);
 
@@ -161,6 +214,39 @@ router.post('/bulk/inbound', requireRole('admin', 'manager', 'user'), warehouseF
  * @route   POST /api/v1/inventory/bulk/outbound
  * @desc    Create multiple outbound transactions
  * @access  Private (admin, manager, user)
+ * @swagger
+ * /inventory/bulk/outbound:
+ *   post:
+ *     summary: Create multiple outbound transactions (REQUIRES warehouseId)
+ *     tags: [Inventory]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/BulkTransactionRequest'
+ *           example:
+ *             warehouseId: 2
+ *             items:
+ *               - productId: 1
+ *                 quantity: 10
+ *                 reference: "VENTA-001"
+ *               - productId: 2
+ *                 quantity: 5
+ *                 reference: "VENTA-001"
+ *             reason: "sale"
+ *             notes: "Venta cliente ABC"
+ *     responses:
+ *       201:
+ *         description: Bulk outbound transactions created successfully
+ *       400:
+ *         description: Insufficient stock
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         description: Warehouse access denied
  */
 router.post('/bulk/outbound', requireRole('admin', 'manager', 'user'), warehouseFilterMiddleware, inventoryController.bulkOutbound);
 
@@ -238,6 +324,51 @@ router.get('/summary/:productId/warehouse/:warehouseId', inventoryController.get
  * @route   GET /api/v1/inventory/warehouses/summary
  * @desc    Get inventory summary for all warehouses
  * @access  Private
+ * @swagger
+ * /inventory/warehouses/summary:
+ *   get:
+ *     summary: Get inventory summary for all warehouses
+ *     description: Returns stock status and statistics for each warehouse. Useful for admin dashboard.
+ *     tags: [Warehouse Management]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Warehouses summary retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/WarehouseSummary'
+ *             example:
+ *               success: true
+ *               data:
+ *                 - warehouse:
+ *                     id: 1
+ *                     code: "BOD-001"
+ *                     name: "Bodega Principal"
+ *                     isMain: true
+ *                     address: "Calle 123, Ciudad"
+ *                     managerName: "Juan Pérez"
+ *                   stats:
+ *                     currentStock: 5000
+ *                     totalInbound: 10000
+ *                     totalOutbound: 4500
+ *                     totalAdjustments: -500
+ *                     uniqueProducts: 150
+ *                     transactionCount: 850
+ *                   lastActivity:
+ *                     date: "2025-11-17T10:30:00Z"
+ *                     type: "OUTBOUND"
+ *                     reason: "SALE"
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
  */
 router.get('/warehouses/summary', inventoryController.getWarehousesSummary);
 
@@ -245,6 +376,72 @@ router.get('/warehouses/summary', inventoryController.getWarehousesSummary);
  * @route   GET /api/v1/inventory/warehouses/:warehouseId/summary
  * @desc    Get detailed inventory summary for a specific warehouse
  * @access  Private
+ * @swagger
+ * /inventory/warehouses/{warehouseId}/summary:
+ *   get:
+ *     summary: Get detailed inventory summary for a specific warehouse
+ *     description: Returns detailed stock information including products and recent transactions for a warehouse.
+ *     tags: [Warehouse Management]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: warehouseId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Warehouse ID
+ *     responses:
+ *       200:
+ *         description: Warehouse summary retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       $ref: '#/components/schemas/WarehouseDetailedSummary'
+ *             example:
+ *               success: true
+ *               data:
+ *                 warehouse:
+ *                   id: 2
+ *                   code: "PV-001"
+ *                   name: "Punto de Venta Centro"
+ *                   isMain: false
+ *                   address: "Av. Principal 456"
+ *                   managerName: "María González"
+ *                   phone: "555-1234"
+ *                   email: "pv-centro@empresa.com"
+ *                 stats:
+ *                   currentStock: 1200
+ *                   totalInbound: 3000
+ *                   totalOutbound: 1750
+ *                   totalAdjustments: -50
+ *                   uniqueProducts: 80
+ *                   transactionCount: 320
+ *                 products:
+ *                   - productId: 1
+ *                     productName: "Producto A"
+ *                     productSku: "SKU-001"
+ *                     currentStock: 50
+ *                     lastUpdated: "2025-11-17T10:30:00Z"
+ *                 recentTransactions:
+ *                   - id: 1234
+ *                     type: "OUTBOUND"
+ *                     reason: "SALE"
+ *                     quantity: -5
+ *                     productName: "Producto A"
+ *                     reference: "VENTA-001"
+ *                     createdAt: "2025-11-17T15:45:00Z"
+ *       401:
+ *         $ref: '#/components/responses/Unauthorized'
+ *       403:
+ *         description: Warehouse access denied (users can only access their assigned warehouse)
+ *       404:
+ *         description: Warehouse not found
  */
 router.get('/warehouses/:warehouseId/summary', inventoryController.getWarehouseSummary);
 

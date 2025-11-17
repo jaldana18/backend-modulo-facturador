@@ -27,8 +27,24 @@ export const createApp = (): Application => {
   // CORS configuration
   app.use(
     cors({
-      origin: config.cors.origin,
+      origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps, Postman, curl)
+        if (!origin) return callback(null, true);
+        
+        // Allow configured origins (can be comma-separated list)
+        const allowedOrigins = config.cors.origin.split(',').map(o => o.trim());
+        
+        if (allowedOrigins.includes(origin)) {
+          callback(null, true);
+        } else {
+          callback(new Error(`Origin ${origin} not allowed by CORS`));
+        }
+      },
       credentials: config.cors.credentials,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      exposedHeaders: ['Content-Range', 'X-Content-Range'],
+      maxAge: 86400, // 24 hours
     })
   );
 

@@ -33,7 +33,18 @@ const swaggerOptions: swaggerJsDoc.Options = {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
-          description: 'Enter your JWT token in the format: Bearer <token>',
+          description: `Enter your JWT token in the format: Bearer <token>
+          
+Token includes:
+- userId: User ID
+- companyId: Company ID  
+- email: User email
+- role: User role (admin, manager, user)
+- warehouseId: Warehouse ID (only for 'user' role, null for admin/manager)
+
+Role-based warehouse access:
+- admin/manager: Full access to all warehouses
+- user: Restricted to assigned warehouse only`,
         },
       },
       schemas: {
@@ -714,7 +725,7 @@ const swaggerOptions: swaggerJsDoc.Options = {
             },
             warehouseId: {
               type: 'integer',
-              description: 'Warehouse ID (optional, uses main warehouse if not specified)',
+              description: 'Warehouse ID (optional, uses main warehouse if not specified). ALWAYS saved in database.',
               example: 1,
             },
             type: {
@@ -858,6 +869,73 @@ const swaggerOptions: swaggerJsDoc.Options = {
             },
           },
         },
+        BulkTransactionRequest: {
+          type: 'object',
+          required: ['warehouseId', 'items', 'reason'],
+          properties: {
+            warehouseId: {
+              type: 'integer',
+              description: 'Warehouse ID (REQUIRED for bulk operations)',
+              example: 2,
+            },
+            items: {
+              type: 'array',
+              description: 'Array of transaction items',
+              items: {
+                type: 'object',
+                required: ['productId', 'quantity'],
+                properties: {
+                  productId: {
+                    type: 'integer',
+                    description: 'Product ID',
+                    example: 1,
+                  },
+                  quantity: {
+                    type: 'number',
+                    minimum: 0.0001,
+                    description: 'Quantity',
+                    example: 100,
+                  },
+                  unitCost: {
+                    type: 'number',
+                    minimum: 0,
+                    description: 'Unit cost (for inbound)',
+                    example: 15.50,
+                  },
+                  reference: {
+                    type: 'string',
+                    maxLength: 100,
+                    description: 'Reference number',
+                    example: 'FAC-001',
+                  },
+                },
+              },
+            },
+            reason: {
+              type: 'string',
+              enum: [
+                'purchase',
+                'sale',
+                'return',
+                'damaged',
+                'lost',
+                'found',
+                'correction',
+                'initial_stock',
+                'transfer_in',
+                'transfer_out',
+                'other',
+              ],
+              description: 'Transaction reason',
+              example: 'purchase',
+            },
+            notes: {
+              type: 'string',
+              maxLength: 500,
+              description: 'Additional notes',
+            },
+          },
+        },
         StockSummary: {
           type: 'object',
           properties: {
@@ -886,6 +964,205 @@ const swaggerOptions: swaggerJsDoc.Options = {
               format: 'date-time',
               nullable: true,
               description: 'Last transaction date',
+            },
+          },
+        },
+        WarehouseSummary: {
+          type: 'object',
+          properties: {
+            warehouse: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'integer',
+                  description: 'Warehouse ID',
+                },
+                code: {
+                  type: 'string',
+                  description: 'Warehouse code',
+                },
+                name: {
+                  type: 'string',
+                  description: 'Warehouse name',
+                },
+                isMain: {
+                  type: 'boolean',
+                  description: 'Is main warehouse',
+                },
+                address: {
+                  type: 'string',
+                  description: 'Full address',
+                },
+                managerName: {
+                  type: 'string',
+                  nullable: true,
+                  description: 'Manager name',
+                },
+              },
+            },
+            stats: {
+              type: 'object',
+              properties: {
+                currentStock: {
+                  type: 'number',
+                  description: 'Total current stock',
+                },
+                totalInbound: {
+                  type: 'number',
+                  description: 'Total inbound quantity',
+                },
+                totalOutbound: {
+                  type: 'number',
+                  description: 'Total outbound quantity',
+                },
+                totalAdjustments: {
+                  type: 'number',
+                  description: 'Total adjustments',
+                },
+                uniqueProducts: {
+                  type: 'integer',
+                  description: 'Number of unique products',
+                },
+                transactionCount: {
+                  type: 'integer',
+                  description: 'Total number of transactions',
+                },
+              },
+            },
+            lastActivity: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                date: {
+                  type: 'string',
+                  format: 'date-time',
+                  description: 'Last activity date',
+                },
+                type: {
+                  type: 'string',
+                  description: 'Transaction type',
+                },
+                reason: {
+                  type: 'string',
+                  description: 'Transaction reason',
+                },
+              },
+            },
+          },
+        },
+        WarehouseDetailedSummary: {
+          type: 'object',
+          properties: {
+            warehouse: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'integer',
+                },
+                code: {
+                  type: 'string',
+                },
+                name: {
+                  type: 'string',
+                },
+                isMain: {
+                  type: 'boolean',
+                },
+                address: {
+                  type: 'string',
+                },
+                managerName: {
+                  type: 'string',
+                  nullable: true,
+                },
+                phone: {
+                  type: 'string',
+                  nullable: true,
+                },
+                email: {
+                  type: 'string',
+                  nullable: true,
+                },
+              },
+            },
+            stats: {
+              type: 'object',
+              properties: {
+                currentStock: {
+                  type: 'number',
+                },
+                totalInbound: {
+                  type: 'number',
+                },
+                totalOutbound: {
+                  type: 'number',
+                },
+                totalAdjustments: {
+                  type: 'number',
+                },
+                uniqueProducts: {
+                  type: 'integer',
+                },
+                transactionCount: {
+                  type: 'integer',
+                },
+              },
+            },
+            products: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  productId: {
+                    type: 'integer',
+                  },
+                  productName: {
+                    type: 'string',
+                  },
+                  productSku: {
+                    type: 'string',
+                    nullable: true,
+                  },
+                  currentStock: {
+                    type: 'number',
+                  },
+                  lastUpdated: {
+                    type: 'string',
+                    format: 'date-time',
+                  },
+                },
+              },
+            },
+            recentTransactions: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: {
+                    type: 'integer',
+                  },
+                  type: {
+                    type: 'string',
+                  },
+                  reason: {
+                    type: 'string',
+                  },
+                  quantity: {
+                    type: 'number',
+                  },
+                  productName: {
+                    type: 'string',
+                  },
+                  reference: {
+                    type: 'string',
+                    nullable: true,
+                  },
+                  createdAt: {
+                    type: 'string',
+                    format: 'date-time',
+                  },
+                },
+              },
             },
           },
         },
@@ -1147,11 +1424,15 @@ const swaggerOptions: swaggerJsDoc.Options = {
       },
       {
         name: 'Warehouses',
-        description: 'Warehouse management endpoints',
+        description: 'Warehouse configuration and CRUD endpoints',
       },
       {
         name: 'Inventory',
-        description: 'Inventory transaction and stock management endpoints',
+        description: 'Inventory transaction and stock management endpoints. Note: Users with role "user" are restricted to their assigned warehouse.',
+      },
+      {
+        name: 'Warehouse Management',
+        description: 'Warehouse inventory administration - summary reports and multi-warehouse operations for dashboard and reporting',
       },
       {
         name: 'Bulk Inventory',
