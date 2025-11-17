@@ -1,0 +1,128 @@
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class CreateCategories1763248549216 implements MigrationInterface {
+    name = 'CreateCategories1763248549216'
+
+    public async up(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`ALTER TABLE "users" DROP CONSTRAINT "fk_users_company"`);
+        await queryRunner.query(`ALTER TABLE "warehouses" DROP CONSTRAINT "fk_warehouses_company"`);
+        await queryRunner.query(`ALTER TABLE "products" DROP CONSTRAINT "fk_products_company"`);
+        await queryRunner.query(`ALTER TABLE "inventory_transactions" DROP CONSTRAINT "fk_inventory_transactions_warehouse"`);
+        await queryRunner.query(`ALTER TABLE "inventory_transactions" DROP CONSTRAINT "fk_inventory_transactions_company"`);
+        await queryRunner.query(`ALTER TABLE "inventory_transactions" DROP CONSTRAINT "fk_inventory_transactions_user"`);
+        await queryRunner.query(`ALTER TABLE "inventory_transactions" DROP CONSTRAINT "fk_inventory_transactions_product"`);
+        await queryRunner.query(`DROP INDEX "idx_users_company" ON "users"`);
+        await queryRunner.query(`DROP INDEX "idx_users_email" ON "users"`);
+        await queryRunner.query(`DROP INDEX "idx_users_company_active" ON "users"`);
+        await queryRunner.query(`DROP INDEX "idx_companies_active" ON "companies"`);
+        await queryRunner.query(`DROP INDEX "idx_companies_tax_id" ON "companies"`);
+        await queryRunner.query(`DROP INDEX "idx_warehouses_company" ON "warehouses"`);
+        await queryRunner.query(`DROP INDEX "idx_warehouses_company_active" ON "warehouses"`);
+        await queryRunner.query(`DROP INDEX "idx_warehouses_company_code" ON "warehouses"`);
+        await queryRunner.query(`DROP INDEX "idx_products_company_sku" ON "products"`);
+        await queryRunner.query(`DROP INDEX "idx_products_company" ON "products"`);
+        await queryRunner.query(`DROP INDEX "idx_products_company_active" ON "products"`);
+        await queryRunner.query(`DROP INDEX "idx_products_company_category" ON "products"`);
+        await queryRunner.query(`DROP INDEX "idx_products_sku" ON "products"`);
+        await queryRunner.query(`DROP INDEX "idx_inventory_transactions_company_product" ON "inventory_transactions"`);
+        await queryRunner.query(`DROP INDEX "idx_inventory_transactions_company_type" ON "inventory_transactions"`);
+        await queryRunner.query(`DROP INDEX "idx_inventory_transactions_company_created" ON "inventory_transactions"`);
+        await queryRunner.query(`DROP INDEX "idx_inventory_transactions_user" ON "inventory_transactions"`);
+        await queryRunner.query(`DROP INDEX "idx_inventory_transactions_product" ON "inventory_transactions"`);
+        await queryRunner.query(`DROP INDEX "idx_inventory_transactions_created" ON "inventory_transactions"`);
+        await queryRunner.query(`DROP INDEX "idx_inventory_transactions_warehouse" ON "inventory_transactions"`);
+        await queryRunner.query(`DROP INDEX "idx_inventory_transactions_company_warehouse_product" ON "inventory_transactions"`);
+        await queryRunner.query(`CREATE TABLE "categories" ("id" int NOT NULL IDENTITY(1,1), "company_id" int NOT NULL, "name" nvarchar(100) NOT NULL, "description" nvarchar(500), "color" varchar(50), "icon" varchar(50), "sort_order" int NOT NULL CONSTRAINT "DF_7a80b3b5a17be9ca70177f0dcd0" DEFAULT 0, "is_active" bit NOT NULL CONSTRAINT "DF_083b4657d537e819d86961f4aa5" DEFAULT 1, "parent_id" int, "created_at" datetime2 NOT NULL CONSTRAINT "DF_a7b2c155b5bad01eb952cf2e562" DEFAULT getdate(), "updated_at" datetime2 NOT NULL CONSTRAINT "DF_55daad89e067f87627f9f9d8586" DEFAULT getdate(), CONSTRAINT "PK_24dbc6126a28ff948da33e97d3b" PRIMARY KEY ("id"))`);
+        await queryRunner.query(`CREATE INDEX "IDX_b050c07f008b7997355d4bd16a" ON "categories" ("company_id", "sort_order") `);
+        await queryRunner.query(`CREATE INDEX "IDX_c63c1fac0caa949ceadd2aa440" ON "categories" ("company_id", "is_active") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_37b092d71327b97c0e7f00c4f4" ON "categories" ("company_id", "name") `);
+        await queryRunner.query(`ALTER TABLE "products" ADD "category_id" int`);
+        await queryRunner.query(`CREATE INDEX "IDX_550b73eb0ffe7d83d3dc597fd9" ON "users" ("company_id", "is_active") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_97672ac88f789774dd47f7c8be" ON "users" ("email") `);
+        await queryRunner.query(`CREATE INDEX "IDX_7ae6334059289559722437bcc1" ON "users" ("company_id") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_37777cf58dd19fb6a6f5cf36bc" ON "companies" ("tax_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_4d0632c00306eec5feecbbdc9f" ON "companies" ("is_active") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_83a2f7c3947e29b4e04b6ccc76" ON "warehouses" ("company_id", "code") `);
+        await queryRunner.query(`CREATE INDEX "IDX_6ae862500a9f905fdb41217337" ON "warehouses" ("company_id", "is_active") `);
+        await queryRunner.query(`CREATE INDEX "IDX_3fcbfd5832b46945f514a7d1f5" ON "warehouses" ("company_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_416f1b5b9e026913bf5b2a95a5" ON "products" ("company_id", "category_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_143bb25d8d1cfb546a452277b0" ON "products" ("company_id", "is_active") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_4af79b7459791a250e1cd54617" ON "products" ("company_id", "sku") `);
+        await queryRunner.query(`CREATE INDEX "IDX_e51672a4898b02f686769f71c2" ON "inventory_transactions" ("user_id") `);
+        await queryRunner.query(`CREATE INDEX "IDX_f3bfc7b7166709869bf3fae628" ON "inventory_transactions" ("company_id", "created_at") `);
+        await queryRunner.query(`CREATE INDEX "IDX_22840a47dfa683484183019e64" ON "inventory_transactions" ("company_id", "type") `);
+        await queryRunner.query(`CREATE INDEX "IDX_a78423f4ab8a52aedc14b3e766" ON "inventory_transactions" ("company_id", "product_id") `);
+        await queryRunner.query(`ALTER TABLE "users" ADD CONSTRAINT "FK_7ae6334059289559722437bcc1c" FOREIGN KEY ("company_id") REFERENCES "companies"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "warehouses" ADD CONSTRAINT "FK_3fcbfd5832b46945f514a7d1f56" FOREIGN KEY ("company_id") REFERENCES "companies"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "categories" ADD CONSTRAINT "FK_987f987126a3f2e4f9ec03db04e" FOREIGN KEY ("company_id") REFERENCES "companies"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "categories" ADD CONSTRAINT "FK_88cea2dc9c31951d06437879b40" FOREIGN KEY ("parent_id") REFERENCES "categories"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "products" ADD CONSTRAINT "FK_b417f1726f6ccafb18730adffb0" FOREIGN KEY ("company_id") REFERENCES "companies"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "products" ADD CONSTRAINT "FK_9a5f6868c96e0069e699f33e124" FOREIGN KEY ("category_id") REFERENCES "categories"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "inventory_transactions" ADD CONSTRAINT "FK_712b646e8725ccbccf3de9fdcdd" FOREIGN KEY ("company_id") REFERENCES "companies"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "inventory_transactions" ADD CONSTRAINT "FK_2520d97de0c9a0fbfc9b00f4c1b" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "inventory_transactions" ADD CONSTRAINT "FK_e51672a4898b02f686769f71c2a" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "inventory_transactions" ADD CONSTRAINT "FK_d49bcd38118deceaeb969a54e4f" FOREIGN KEY ("warehouse_id") REFERENCES "warehouses"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+    }
+
+    public async down(queryRunner: QueryRunner): Promise<void> {
+        await queryRunner.query(`ALTER TABLE "inventory_transactions" DROP CONSTRAINT "FK_d49bcd38118deceaeb969a54e4f"`);
+        await queryRunner.query(`ALTER TABLE "inventory_transactions" DROP CONSTRAINT "FK_e51672a4898b02f686769f71c2a"`);
+        await queryRunner.query(`ALTER TABLE "inventory_transactions" DROP CONSTRAINT "FK_2520d97de0c9a0fbfc9b00f4c1b"`);
+        await queryRunner.query(`ALTER TABLE "inventory_transactions" DROP CONSTRAINT "FK_712b646e8725ccbccf3de9fdcdd"`);
+        await queryRunner.query(`ALTER TABLE "products" DROP CONSTRAINT "FK_9a5f6868c96e0069e699f33e124"`);
+        await queryRunner.query(`ALTER TABLE "products" DROP CONSTRAINT "FK_b417f1726f6ccafb18730adffb0"`);
+        await queryRunner.query(`ALTER TABLE "categories" DROP CONSTRAINT "FK_88cea2dc9c31951d06437879b40"`);
+        await queryRunner.query(`ALTER TABLE "categories" DROP CONSTRAINT "FK_987f987126a3f2e4f9ec03db04e"`);
+        await queryRunner.query(`ALTER TABLE "warehouses" DROP CONSTRAINT "FK_3fcbfd5832b46945f514a7d1f56"`);
+        await queryRunner.query(`ALTER TABLE "users" DROP CONSTRAINT "FK_7ae6334059289559722437bcc1c"`);
+        await queryRunner.query(`DROP INDEX "IDX_a78423f4ab8a52aedc14b3e766" ON "inventory_transactions"`);
+        await queryRunner.query(`DROP INDEX "IDX_22840a47dfa683484183019e64" ON "inventory_transactions"`);
+        await queryRunner.query(`DROP INDEX "IDX_f3bfc7b7166709869bf3fae628" ON "inventory_transactions"`);
+        await queryRunner.query(`DROP INDEX "IDX_e51672a4898b02f686769f71c2" ON "inventory_transactions"`);
+        await queryRunner.query(`DROP INDEX "IDX_4af79b7459791a250e1cd54617" ON "products"`);
+        await queryRunner.query(`DROP INDEX "IDX_143bb25d8d1cfb546a452277b0" ON "products"`);
+        await queryRunner.query(`DROP INDEX "IDX_416f1b5b9e026913bf5b2a95a5" ON "products"`);
+        await queryRunner.query(`DROP INDEX "IDX_3fcbfd5832b46945f514a7d1f5" ON "warehouses"`);
+        await queryRunner.query(`DROP INDEX "IDX_6ae862500a9f905fdb41217337" ON "warehouses"`);
+        await queryRunner.query(`DROP INDEX "IDX_83a2f7c3947e29b4e04b6ccc76" ON "warehouses"`);
+        await queryRunner.query(`DROP INDEX "IDX_4d0632c00306eec5feecbbdc9f" ON "companies"`);
+        await queryRunner.query(`DROP INDEX "IDX_37777cf58dd19fb6a6f5cf36bc" ON "companies"`);
+        await queryRunner.query(`DROP INDEX "IDX_7ae6334059289559722437bcc1" ON "users"`);
+        await queryRunner.query(`DROP INDEX "IDX_97672ac88f789774dd47f7c8be" ON "users"`);
+        await queryRunner.query(`DROP INDEX "IDX_550b73eb0ffe7d83d3dc597fd9" ON "users"`);
+        await queryRunner.query(`ALTER TABLE "products" DROP COLUMN "category_id"`);
+        await queryRunner.query(`DROP INDEX "IDX_37b092d71327b97c0e7f00c4f4" ON "categories"`);
+        await queryRunner.query(`DROP INDEX "IDX_c63c1fac0caa949ceadd2aa440" ON "categories"`);
+        await queryRunner.query(`DROP INDEX "IDX_b050c07f008b7997355d4bd16a" ON "categories"`);
+        await queryRunner.query(`DROP TABLE "categories"`);
+        await queryRunner.query(`CREATE INDEX "idx_inventory_transactions_company_warehouse_product" ON "inventory_transactions" ("company_id", "warehouse_id", "product_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_inventory_transactions_warehouse" ON "inventory_transactions" ("warehouse_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_inventory_transactions_created" ON "inventory_transactions" ("created_at") `);
+        await queryRunner.query(`CREATE INDEX "idx_inventory_transactions_product" ON "inventory_transactions" ("product_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_inventory_transactions_user" ON "inventory_transactions" ("user_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_inventory_transactions_company_created" ON "inventory_transactions" ("company_id", "created_at") `);
+        await queryRunner.query(`CREATE INDEX "idx_inventory_transactions_company_type" ON "inventory_transactions" ("company_id", "type") `);
+        await queryRunner.query(`CREATE INDEX "idx_inventory_transactions_company_product" ON "inventory_transactions" ("company_id", "product_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_products_sku" ON "products" ("sku") `);
+        await queryRunner.query(`CREATE INDEX "idx_products_company_category" ON "products" ("company_id", "category") `);
+        await queryRunner.query(`CREATE INDEX "idx_products_company_active" ON "products" ("company_id", "is_active") `);
+        await queryRunner.query(`CREATE INDEX "idx_products_company" ON "products" ("company_id") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "idx_products_company_sku" ON "products" ("company_id", "sku") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "idx_warehouses_company_code" ON "warehouses" ("company_id", "code") `);
+        await queryRunner.query(`CREATE INDEX "idx_warehouses_company_active" ON "warehouses" ("company_id", "is_active") `);
+        await queryRunner.query(`CREATE INDEX "idx_warehouses_company" ON "warehouses" ("company_id") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "idx_companies_tax_id" ON "companies" ("tax_id") `);
+        await queryRunner.query(`CREATE INDEX "idx_companies_active" ON "companies" ("is_active") `);
+        await queryRunner.query(`CREATE INDEX "idx_users_company_active" ON "users" ("company_id", "is_active") `);
+        await queryRunner.query(`CREATE UNIQUE INDEX "idx_users_email" ON "users" ("email") `);
+        await queryRunner.query(`CREATE INDEX "idx_users_company" ON "users" ("company_id") `);
+        await queryRunner.query(`ALTER TABLE "inventory_transactions" ADD CONSTRAINT "fk_inventory_transactions_product" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "inventory_transactions" ADD CONSTRAINT "fk_inventory_transactions_user" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "inventory_transactions" ADD CONSTRAINT "fk_inventory_transactions_company" FOREIGN KEY ("company_id") REFERENCES "companies"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "inventory_transactions" ADD CONSTRAINT "fk_inventory_transactions_warehouse" FOREIGN KEY ("warehouse_id") REFERENCES "warehouses"("id") ON DELETE NO ACTION ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "products" ADD CONSTRAINT "fk_products_company" FOREIGN KEY ("company_id") REFERENCES "companies"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "warehouses" ADD CONSTRAINT "fk_warehouses_company" FOREIGN KEY ("company_id") REFERENCES "companies"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        await queryRunner.query(`ALTER TABLE "users" ADD CONSTRAINT "fk_users_company" FOREIGN KEY ("company_id") REFERENCES "companies"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+    }
+
+}

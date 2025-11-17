@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(test:*)",
+      "Bash(node test-db-connection.js:*)",
+      "Bash(node test-db-connection-master.js:*)",
+      "Bash(npm run migration:run:*)",
+      "Bash(npm run seed:*)",
+      "Bash(node -e:*)",
+      "Bash(npm run dev:*)",
+      "Bash(timeout 3 echo:*)",
+      "Bash(if exist srctypes rmdir /s /q srctypes)",
+      "Bash(find:*)",
+      "Bash(npm run build:*)",
+      "Bash(curl:*)",
+      "Bash(taskkill:*)",
+      "mcp__sequential-thinking__sequentialthinking"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
