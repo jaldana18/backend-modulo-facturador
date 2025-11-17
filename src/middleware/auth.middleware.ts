@@ -35,6 +35,7 @@ export const authenticateToken = async (
         companyId: decoded.companyId,
         email: decoded.email,
         role: decoded.role,
+        warehouseId: decoded.warehouseId, // Include warehouse for 'user' role
       };
 
       loggers.logAuth('token_verified', decoded.userId, decoded.email, true);

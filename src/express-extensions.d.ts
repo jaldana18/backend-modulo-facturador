@@ -7,6 +7,7 @@ declare module 'express-serve-static-core' {
       companyId: number;
       email: string;
       role: string;
+      warehouseId?: number | null; // Only for 'user' role
     };
     dataSource?: DataSource;
   }

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { InventoryController } from '../controllers/InventoryController';
 import { authenticateToken, requireRole } from '../middleware/auth.middleware';
 import { tenantContextMiddleware } from '../middleware/tenantContext.middleware';
+import { warehouseFilterMiddleware, validateWarehouseAccess } from '../middleware/warehouseFilter.middleware';
 
 const router = Router();
 const inventoryController = new InventoryController();
@@ -147,21 +148,21 @@ router.get('/reports/totals', inventoryController.getTotalsByType);
  * @desc    Adjust stock to a specific value
  * @access  Private (admin, manager, user)
  */
-router.post('/adjust', requireRole('admin', 'manager', 'user'), inventoryController.adjustStock);
+router.post('/adjust', requireRole('admin', 'manager', 'user'), warehouseFilterMiddleware, inventoryController.adjustStock);
 
 /**
  * @route   POST /api/v1/inventory/bulk/inbound
  * @desc    Create multiple inbound transactions
  * @access  Private (admin, manager, user)
  */
-router.post('/bulk/inbound', requireRole('admin', 'manager', 'user'), inventoryController.bulkInbound);
+router.post('/bulk/inbound', requireRole('admin', 'manager', 'user'), warehouseFilterMiddleware, inventoryController.bulkInbound);
 
 /**
  * @route   POST /api/v1/inventory/bulk/outbound
  * @desc    Create multiple outbound transactions
  * @access  Private (admin, manager, user)
  */
-router.post('/bulk/outbound', requireRole('admin', 'manager', 'user'), inventoryController.bulkOutbound);
+router.post('/bulk/outbound', requireRole('admin', 'manager', 'user'), warehouseFilterMiddleware, inventoryController.bulkOutbound);
 
 /**
  * @route   GET /api/v1/inventory/stock/:productId
@@ -203,14 +204,14 @@ router.get('/transactions/:id', inventoryController.getTransactionById);
  * @desc    Create a new inventory transaction
  * @access  Private (admin, manager, user)
  */
-router.post('/transactions', requireRole('admin', 'manager', 'user'), inventoryController.createTransaction);
+router.post('/transactions', requireRole('admin', 'manager', 'user'), warehouseFilterMiddleware, inventoryController.createTransaction);
 
 /**
  * @route   POST /api/v1/inventory/transfer
  * @desc    Transfer stock between warehouses
  * @access  Private (admin, manager, user)
  */
-router.post('/transfer', requireRole('admin', 'manager', 'user'), inventoryController.transferBetweenWarehouses);
+router.post('/transfer', requireRole('admin', 'manager', 'user'), warehouseFilterMiddleware, inventoryController.transferBetweenWarehouses);
 
 /**
  * @route   GET /api/v1/inventory/stock/:productId/warehouses
@@ -232,5 +233,19 @@ router.get('/stock/:productId/warehouse/:warehouseId', inventoryController.getSt
  * @access  Private
  */
 router.get('/summary/:productId/warehouse/:warehouseId', inventoryController.getStockSummaryByWarehouse);
+
+/**
+ * @route   GET /api/v1/inventory/warehouses/summary
+ * @desc    Get inventory summary for all warehouses
+ * @access  Private
+ */
+router.get('/warehouses/summary', inventoryController.getWarehousesSummary);
+
+/**
+ * @route   GET /api/v1/inventory/warehouses/:warehouseId/summary
+ * @desc    Get detailed inventory summary for a specific warehouse
+ * @access  Private
+ */
+router.get('/warehouses/:warehouseId/summary', inventoryController.getWarehouseSummary);
 
 export default router;

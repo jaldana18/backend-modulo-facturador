@@ -39,6 +39,7 @@ export interface JWTPayload {
   companyId: number;
   email: string;
   role: string;
+  warehouseId?: number | null; // Only for 'user' role
 }
 
 export type UserRole = 'admin' | 'manager' | 'user';

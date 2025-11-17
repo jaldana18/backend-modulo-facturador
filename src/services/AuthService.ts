@@ -52,6 +52,7 @@ export class AuthService {
       companyId: user.companyId,
       email: user.email,
       role: user.role,
+      warehouseId: user.warehouseId, // Include warehouse for 'user' role
     };
 
     const accessToken = generateAccessToken(payload);
@@ -134,6 +135,7 @@ export class AuthService {
       companyId: user.companyId,
       email: user.email,
       role: user.role,
+      warehouseId: user.warehouseId, // Include warehouse for 'user' role
     };
 
     const newAccessToken = generateAccessToken(payload);
