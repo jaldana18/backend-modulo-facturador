@@ -14,6 +14,7 @@ import {
 import { ApiError } from '../middleware/errorHandler.middleware';
 import { Repository } from 'typeorm';
 import { BatchService } from './BatchService';
+import { loggers } from '../config/logger';
 
 /**
  * Service for bulk inventory operations
@@ -97,10 +98,26 @@ export class BulkInventoryService {
       warehouses.map((w) => [w.code.toLowerCase(), w])
     );
 
+    // Validate that company has at least one warehouse
+    if (warehouses.length === 0) {
+      throw new ApiError(
+        400,
+        'NO_WAREHOUSES',
+        'No hay almacenes registrados en la empresa. Debe crear al menos un almacén antes de cargar inventario.'
+      );
+    }
+
     // Get default warehouse
     let defaultWarehouse: Warehouse | null = null;
     if (defaultWarehouseCode) {
       defaultWarehouse = warehouseMap.get(defaultWarehouseCode.toLowerCase()) || null;
+      if (!defaultWarehouse) {
+        throw new ApiError(
+          400,
+          'INVALID_DEFAULT_WAREHOUSE',
+          `El almacén por defecto '${defaultWarehouseCode}' no existe. Almacenes disponibles: ${warehouses.map(w => w.code).join(', ')}`
+        );
+      }
     }
     if (!defaultWarehouse) {
       // Get main warehouse as fallback
@@ -153,10 +170,10 @@ export class BulkInventoryService {
               });
 
               product = await this.productRepository.save(newProduct);
-              
+
               // Add to map for subsequent rows with same SKU
               productMap.set(dto.sku.toLowerCase(), product);
-              
+
               // Track created product
               result.createdProducts!.push({
                 sku: product.sku,
@@ -164,6 +181,15 @@ export class BulkInventoryService {
                 productId: product.id,
               });
               result.summary.productsCreated!++;
+
+              // Log auto-created product
+              loggers.logOperation('product_auto_created', userId, companyId, {
+                productId: product.id,
+                sku: product.sku,
+                name: product.name,
+                source: 'bulk_inventory_upload',
+                rowNumber,
+              });
             } else {
               // In dry-run, simulate product creation
               result.createdProducts!.push({
@@ -294,6 +320,17 @@ export class BulkInventoryService {
         });
         result.errorCount++;
 
+        // Log individual row errors for critical failures
+        if (!skipErrors || result.errorCount === 1) {
+          loggers.logError(error, {
+            operation: 'bulk_inventory_upload_row_error',
+            userId,
+            companyId,
+            rowNumber,
+            skipErrors,
+          });
+        }
+
         if (!skipErrors) {
           break;
         }
@@ -301,6 +338,23 @@ export class BulkInventoryService {
     }
 
     result.summary.productsAffected = processedProducts.size;
+
+    // Log the bulk upload operation
+    if (!dryRun) {
+      loggers.logOperation('bulk_inventory_upload', userId, companyId, {
+        totalRows: result.totalRows,
+        successCount: result.successCount,
+        errorCount: result.errorCount,
+        productsCreated: result.summary.productsCreated,
+        productsAffected: result.summary.productsAffected,
+        batchesCreated: result.summary.batchesCreated,
+        totalQuantity: result.summary.totalQuantity,
+        totalCost: result.summary.totalCost,
+        autoCreateProducts,
+        skipErrors,
+        hasErrors: result.errorCount > 0,
+      });
+    }
 
     return result;
   }
@@ -316,6 +370,7 @@ export class BulkInventoryService {
         'product_name',
         'nombre',
         'nombre del producto',
+        'nombre producto',
         'producto',
         'name',
       ]),
@@ -363,6 +418,7 @@ export class BulkInventoryService {
       reference: this.getColumnValue(row, [
         'reference',
         'referencia',
+        'referencia/oc',
         'orden de compra',
         'OC',
         'purchase order',

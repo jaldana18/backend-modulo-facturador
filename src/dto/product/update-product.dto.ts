@@ -57,5 +57,10 @@ export class UpdateProductDto {
   isActive?: boolean;
 
   @IsOptional()
+  @IsString({ message: 'Image URL must be a string' })
+  @MaxLength(500, { message: 'Image URL must not exceed 500 characters' })
+  imageUrl?: string | null;
+
+  @IsOptional()
   metadata?: any; // Will be stringified to JSON
 }

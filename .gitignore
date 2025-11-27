@@ -49,3 +49,7 @@ temp/
 # Database
 *.sqlite
 *.db
+
+# Uploads (product images, etc.)
+uploads/
+!uploads/.gitkeep

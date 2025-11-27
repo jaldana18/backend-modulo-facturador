@@ -87,6 +87,9 @@ export class Product {
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
+  @Column({ name: 'image_url', type: 'nvarchar', length: 500, nullable: true })
+  imageUrl: string | null; // URL or relative path to product image
+
   @Column({ type: 'nvarchar', length: 'max', nullable: true })
   metadata: string | null; // JSON string for additional fields
 

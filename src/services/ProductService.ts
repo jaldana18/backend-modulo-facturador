@@ -102,6 +102,7 @@ export class ProductService {
     if (dto.cost !== undefined) product.cost = dto.cost;
     if (dto.price !== undefined) product.price = dto.price;
     if (dto.isActive !== undefined) product.isActive = dto.isActive;
+    if (dto.imageUrl !== undefined) product.imageUrl = dto.imageUrl;
     if (dto.metadata !== undefined) {
       product.metadata = dto.metadata ? JSON.stringify(dto.metadata) : null;
     }

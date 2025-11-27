@@ -250,6 +250,12 @@ Role-based warehouse access:
               type: 'boolean',
               description: 'Whether product is active',
             },
+            imageUrl: {
+              type: 'string',
+              nullable: true,
+              description: 'URL or relative path to product image',
+              example: '/uploads/products/company-1/550e8400-e29b-41d4-a716-446655440000.jpg'
+            },
             metadata: {
               type: 'object',
               nullable: true,
@@ -319,6 +325,13 @@ Role-based warehouse access:
               description: 'Unit of measure',
               example: 'piece',
             },
+            imageUrl: {
+              type: 'string',
+              nullable: true,
+              maxLength: 500,
+              description: 'URL or relative path to product image',
+              example: '/uploads/products/company-1/550e8400-e29b-41d4-a716-446655440000.jpg'
+            },
             metadata: {
               type: 'object',
               description: 'Additional metadata',
@@ -372,11 +385,43 @@ Role-based warehouse access:
               type: 'boolean',
               description: 'Whether product is active',
             },
+            imageUrl: {
+              type: 'string',
+              nullable: true,
+              maxLength: 500,
+              description: 'URL or relative path to product image',
+              example: '/uploads/products/company-1/550e8400-e29b-41d4-a716-446655440000.jpg'
+            },
             metadata: {
               type: 'object',
               description: 'Additional metadata',
             },
           },
+        },
+        ProductImageUploadResponse: {
+          type: 'object',
+          properties: {
+            imageUrl: {
+              type: 'string',
+              description: 'Relative URL to the uploaded image',
+              example: '/uploads/products/company-1/550e8400-e29b-41d4-a716-446655440000.jpg'
+            },
+            filename: {
+              type: 'string',
+              description: 'Generated filename with UUID',
+              example: '550e8400-e29b-41d4-a716-446655440000.jpg'
+            },
+            size: {
+              type: 'integer',
+              description: 'File size in bytes',
+              example: 245680
+            },
+            mimetype: {
+              type: 'string',
+              description: 'File MIME type',
+              example: 'image/jpeg'
+            }
+          }
         },
         // Warehouse schemas
         Warehouse: {

@@ -2,6 +2,7 @@ import 'express-async-errors';
 import express, { Application } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import path from 'path';
 import swaggerUi from 'swagger-ui-express';
 import { config } from './config/environment';
 import { AppDataSource } from './config/database';
@@ -51,6 +52,10 @@ export const createApp = (): Application => {
   // Body parsing middleware
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+  // Serve static files for uploaded images
+  const uploadsPath = path.join(process.cwd(), 'uploads');
+  app.use('/uploads', express.static(uploadsPath));
 
   // Request logging
   app.use(requestLogger);

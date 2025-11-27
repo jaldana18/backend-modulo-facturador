@@ -10,6 +10,10 @@ import analyticsRoutes from './analytics.routes';
 import batchRoutes from './batch.routes';
 import bulkProductRoutes from './bulk-product.routes';
 import bulkInventoryRoutes from './bulk-inventory.routes';
+import customerRoutes from './customer.routes';
+import paymentMethodRoutes from './payment-method.routes';
+import saleRoutes from './sale.routes';
+import paymentRoutes from './payment.routes';
 
 const router = Router();
 
@@ -27,5 +31,9 @@ router.use('/users', userRoutes);
 router.use('/categories', categoryRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/batches', batchRoutes);
+router.use('/customers', customerRoutes);
+router.use('/payment-methods', paymentMethodRoutes);
+router.use('/sales', saleRoutes);
+router.use('/payments', paymentRoutes);
 
 export default router;

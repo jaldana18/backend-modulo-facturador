@@ -1117,6 +1117,15 @@ const ERROR_HANDLERS = {
     alert('El almacén no existe o no está activo');
   },
   
+  'NO_WAREHOUSES': () => {
+    alert('No hay almacenes registrados en la empresa.\nDebe crear al menos un almacén antes de cargar inventario.');
+    navigate('/warehouses/create');
+  },
+  
+  'INVALID_DEFAULT_WAREHOUSE': (error) => {
+    alert(`El almacén especificado no existe.\n${error.message}`);
+  },
+  
   'INVALID_QUANTITY': () => {
     alert('La cantidad debe ser mayor a 0');
   },
@@ -1150,6 +1159,173 @@ async function handleApiCall(apiFunction) {
 
 ---
 
+## ⚠️ VALIDACIÓN PREVIA: ALMACENES OBLIGATORIOS
+
+### 🔴 IMPORTANTE: Antes de cargar inventario
+
+**El sistema REQUIERE que exista al menos UN almacén creado antes de poder cargar inventario.**
+
+#### Validación automática del backend:
+
+Cuando intentas cargar inventario masivo (`POST /api/v1/inventory/bulk/upload`), el backend valida:
+
+1. **Si NO hay almacenes creados en la empresa:**
+   ```json
+   {
+     "success": false,
+     "error": {
+       "code": "NO_WAREHOUSES",
+       "message": "No hay almacenes registrados en la empresa. Debe crear al menos un almacén antes de cargar inventario."
+     }
+   }
+   ```
+
+2. **Si especificas un almacén por defecto que no existe:**
+   ```json
+   {
+     "success": false,
+     "error": {
+       "code": "INVALID_DEFAULT_WAREHOUSE",
+       "message": "El almacén por defecto 'WH-999' no existe. Almacenes disponibles: WH-001, WH-002"
+     }
+   }
+   ```
+
+#### Implementación en el frontend:
+
+```javascript
+async function validateBeforeUpload() {
+  try {
+    // Consultar almacenes disponibles
+    const warehouses = await getWarehouses();
+    
+    if (warehouses.length === 0) {
+      // Mostrar mensaje y redirigir a creación de almacén
+      const shouldCreate = confirm(
+        '⚠️ No hay almacenes registrados.\n\n' +
+        'Debe crear al menos un almacén antes de cargar inventario.\n\n' +
+        '¿Desea crear un almacén ahora?'
+      );
+      
+      if (shouldCreate) {
+        navigate('/warehouses/create');
+      }
+      
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error validando almacenes:', error);
+    return false;
+  }
+}
+
+// Uso antes de mostrar el formulario de carga
+async function showBulkUploadForm() {
+  const isValid = await validateBeforeUpload();
+  
+  if (!isValid) {
+    return; // No mostrar el formulario
+  }
+  
+  // Continuar con la carga
+  // ...
+}
+```
+
+#### Componente de validación visual:
+
+```jsx
+function BulkInventoryUpload() {
+  const [warehouses, setWarehouses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    loadWarehouses();
+  }, []);
+  
+  async function loadWarehouses() {
+    try {
+      const data = await getWarehouses();
+      setWarehouses(data);
+    } catch (error) {
+      console.error('Error cargando almacenes:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+  
+  if (loading) {
+    return <Loading />;
+  }
+  
+  // Si NO hay almacenes, mostrar mensaje de advertencia
+  if (warehouses.length === 0) {
+    return (
+      <AlertaAlmacenesRequeridos>
+        <IconoAdvertencia />
+        <h2>⚠️ Almacenes Requeridos</h2>
+        <p>
+          No hay almacenes registrados en la empresa.
+          Debe crear al menos un almacén antes de poder cargar inventario.
+        </p>
+        <BotonPrimario onClick={() => navigate('/warehouses/create')}>
+          Crear Almacén
+        </BotonPrimario>
+        <BotonSecundario onClick={() => navigate('/warehouses')}>
+          Ver Almacenes
+        </BotonSecundario>
+      </AlertaAlmacenesRequeridos>
+    );
+  }
+  
+  // Si hay almacenes, mostrar el formulario normal
+  return (
+    <FormularioCargaMasiva>
+      {/* ... formulario de carga ... */}
+    </FormularioCargaMasiva>
+  );
+}
+```
+
+#### Flujo recomendado para nuevas empresas:
+
+1. **Onboarding inicial:**
+   ```
+   Login → Crear Empresa → Crear Almacén Principal → Cargar Inventario
+   ```
+
+2. **Validación en rutas:**
+   ```javascript
+   // En el router o middleware de navegación
+   function canAccessInventoryUpload() {
+     const warehouses = getWarehousesFromCache();
+     
+     if (!warehouses || warehouses.length === 0) {
+       toast.warning('Debe crear un almacén primero');
+       return '/warehouses/create';
+     }
+     
+     return true;
+   }
+   ```
+
+3. **Mensaje amigable:**
+   ```javascript
+   // En lugar de error técnico, mostrar ayuda
+   const ERROR_MESSAGES = {
+     'NO_WAREHOUSES': {
+       title: 'Almacenes Requeridos',
+       message: 'Para gestionar inventario, primero necesitas crear un almacén donde almacenar los productos.',
+       action: 'Crear mi primer almacén',
+       redirectTo: '/warehouses/create'
+     }
+   };
+   ```
+
+---
+
 ## 📋 CHECKLIST DE IMPLEMENTACIÓN
 
 ### ✅ Autenticación
@@ -1166,6 +1342,9 @@ async function handleApiCall(apiFunction) {
 - [ ] Vista de detalle de almacén
 - [ ] Dashboard administrativo de almacenes
 - [ ] Auto-selección de almacén para users
+- [ ] **Validación de existencia de almacenes antes de carga masiva**
+- [ ] **Mensaje de advertencia si no hay almacenes creados**
+- [ ] **Redirección a creación de almacén desde carga masiva**
 
 ### ✅ Operaciones de Inventario
 - [ ] Formulario de entrada individual (INBOUND)
@@ -1175,6 +1354,7 @@ async function handleApiCall(apiFunction) {
 - [ ] Formulario de transferencia (solo admin/manager)
 - [ ] Formulario de ajuste de stock
 - [ ] Validación de stock antes de salidas
+- [ ] **Validación previa: almacenes existentes**
 
 ### ✅ Consultas
 - [ ] Consultar stock de producto por almacenes
@@ -1202,6 +1382,9 @@ async function handleApiCall(apiFunction) {
 - [ ] Validación de acceso a almacenes
 - [ ] Validación de campos requeridos
 - [ ] Validación de permisos por rol
+- [ ] **Validación de almacenes creados antes de operaciones**
+- [ ] **Manejo de error NO_WAREHOUSES**
+- [ ] **Manejo de error INVALID_DEFAULT_WAREHOUSE**
 
 ---
 

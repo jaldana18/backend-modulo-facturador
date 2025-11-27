@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { ProductController } from '../controllers/ProductController';
 import { authenticateToken, requireRole } from '../middleware/auth.middleware';
 import { tenantContextMiddleware } from '../middleware/tenantContext.middleware';
+import { uploadSingleImage, handleImageUploadError } from '../middleware/imageUpload.middleware';
 
 const router = Router();
 const productController = new ProductController();
@@ -71,5 +72,29 @@ router.delete('/:id', (req, res, next) => {
   }
   return requireRole('admin', 'manager')(req, res, next);
 }, productController.deleteProduct);
+
+/**
+ * @route   POST /api/v1/products/:id/image
+ * @desc    Upload or replace product image
+ * @access  Private (admin, manager)
+ */
+router.post(
+  '/:id/image',
+  requireRole('admin', 'manager'),
+  uploadSingleImage,
+  handleImageUploadError,
+  productController.uploadProductImage
+);
+
+/**
+ * @route   DELETE /api/v1/products/:id/image
+ * @desc    Delete product image
+ * @access  Private (admin, manager)
+ */
+router.delete(
+  '/:id/image',
+  requireRole('admin', 'manager'),
+  productController.deleteProductImage
+);
 
 export default router;
