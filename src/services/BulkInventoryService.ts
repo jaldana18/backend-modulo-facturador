@@ -14,7 +14,9 @@ import {
 import { ApiError } from '../middleware/errorHandler.middleware';
 import { Repository } from 'typeorm';
 import { BatchService } from './BatchService';
+import { InventoryService } from './InventoryService';
 import { loggers } from '../config/logger';
+import { ActivityType } from '../entities/ActivityLog.entity';
 
 /**
  * Service for bulk inventory operations
@@ -24,12 +26,14 @@ export class BulkInventoryService {
   private warehouseRepository: Repository<Warehouse>;
   private transactionRepository: Repository<InventoryTransaction>;
   private batchService: BatchService;
+  private inventoryService: InventoryService;
 
   constructor() {
     this.productRepository = AppDataSource.getRepository(Product);
     this.warehouseRepository = AppDataSource.getRepository(Warehouse);
     this.transactionRepository = AppDataSource.getRepository(InventoryTransaction);
     this.batchService = new BatchService();
+    this.inventoryService = new InventoryService();
   }
 
   /**
@@ -264,6 +268,14 @@ export class BulkInventoryService {
           continue;
         }
 
+        // Get current stock before transaction
+        const currentStock = await this.inventoryService.getCurrentStockByWarehouse(
+          companyId,
+          product.id,
+          warehouse.id
+        );
+        const newStock = currentStock + dto.quantity;
+
         // Create inbound transaction
         const transaction = this.transactionRepository.create({
           companyId,
@@ -273,6 +285,8 @@ export class BulkInventoryService {
           type: TransactionType.INBOUND,
           reason: TransactionReason.PURCHASE,
           quantity: dto.quantity,
+          previousStock: currentStock,
+          newStock: newStock,
           unitCost: dto.unitCost,
           totalCost: dto.quantity * dto.unitCost,
           reference: dto.reference || null,
@@ -354,6 +368,25 @@ export class BulkInventoryService {
         skipErrors,
         hasErrors: result.errorCount > 0,
       });
+
+      // Log user activity for frontend
+      if (result.successCount > 0) {
+        await loggers.logActivity({
+          companyId,
+          userId,
+          activityType: ActivityType.INVENTORY_UPLOAD,
+          description: `Cargó ${result.successCount} productos al inventario (${result.summary.totalQuantity} unidades, $${result.summary.totalCost.toFixed(2)})`,
+          entityType: 'inventory',
+          metadata: {
+            totalRows: result.totalRows,
+            successCount: result.successCount,
+            errorCount: result.errorCount,
+            totalQuantity: result.summary.totalQuantity,
+            totalCost: result.summary.totalCost,
+            batchesCreated: result.summary.batchesCreated,
+          },
+        });
+      }
     }
 
     return result;

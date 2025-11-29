@@ -14,6 +14,8 @@ import customerRoutes from './customer.routes';
 import paymentMethodRoutes from './payment-method.routes';
 import saleRoutes from './sale.routes';
 import paymentRoutes from './payment.routes';
+import auditLogRoutes from './audit-log.routes';
+import activityLogRoutes from './activity-log.routes';
 
 const router = Router();
 
@@ -35,5 +37,7 @@ router.use('/customers', customerRoutes);
 router.use('/payment-methods', paymentMethodRoutes);
 router.use('/sales', saleRoutes);
 router.use('/payments', paymentRoutes);
+router.use('/audit-logs', auditLogRoutes);
+router.use('/activity-logs', activityLogRoutes);
 
 export default router;

@@ -161,6 +161,34 @@ Role-based warehouse access:
             },
           },
         },
+        ResetPasswordRequest: {
+          type: 'object',
+          required: ['email', 'newPassword'],
+          properties: {
+            email: {
+              type: 'string',
+              format: 'email',
+              description: 'User email address',
+              example: 'user@example.com',
+            },
+            newPassword: {
+              type: 'string',
+              minLength: 6,
+              description: 'New password (minimum 6 characters)',
+              example: 'NewPassword123',
+            },
+          },
+        },
+        ResetPasswordResponse: {
+          type: 'object',
+          properties: {
+            message: {
+              type: 'string',
+              description: 'Success message',
+              example: 'Password reset successfully',
+            },
+          },
+        },
         User: {
           type: 'object',
           properties: {

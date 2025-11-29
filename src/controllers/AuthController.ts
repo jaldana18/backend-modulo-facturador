@@ -3,6 +3,7 @@ import { AuthService } from '../services/AuthService';
 import { LoginDto } from '../dto/auth/login.dto';
 import { RefreshTokenDto } from '../dto/auth/refresh.dto';
 import { RegisterCompanyDto } from '../dto/auth/register-company.dto';
+import { ResetPasswordDto } from '../dto/auth/reset-password.dto';
 import { validateDto } from '../utils/validators.util';
 import { ApiResponse } from '../common.types';
 
@@ -107,5 +108,28 @@ export class AuthController {
     };
 
     res.status(201).json(response);
+  };
+
+  /**
+   * POST /api/v1/auth/reset-password
+   * Public endpoint to reset password using only email
+   */
+  resetPassword = async (req: Request, res: Response): Promise<void> => {
+    // Validate DTO
+    const resetPasswordDto = await validateDto(ResetPasswordDto, req.body);
+
+    // Reset password
+    const result = await this.authService.resetPassword(
+      resetPasswordDto.email,
+      resetPasswordDto.newPassword
+    );
+
+    const response: ApiResponse = {
+      success: true,
+      data: result,
+      message: 'Password reset successfully',
+    };
+
+    res.json(response);
   };
 }

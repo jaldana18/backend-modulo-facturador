@@ -91,7 +91,7 @@ export const config: EnvironmentConfig = {
     maxRequests: parseInt(getEnvVar('RATE_LIMIT_MAX_REQUESTS', '100'), 10),
   },
   cors: {
-    origin: getEnvVar('CORS_ORIGIN', 'http://localhost:3001'),
+    origin: getEnvVar('CORS_ORIGIN', 'http://localhost:3000,http://localhost:3001'),
     credentials: getEnvVar('CORS_CREDENTIALS', 'true') === 'true',
   },
   api: {

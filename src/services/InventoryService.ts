@@ -5,6 +5,7 @@ import { InventoryTransaction, TransactionType, TransactionReason } from '../ent
 import { ApiError } from '../middleware/errorHandler.middleware';
 import { loggers } from '../config/logger';
 import { AppDataSource } from '../config/database';
+import { ActivityType } from '../entities/ActivityLog.entity';
 
 export interface CreateTransactionDto {
   productId: number;
@@ -173,6 +174,43 @@ export class InventoryService {
       quantity: adjustedQuantity,
       previousStock: currentStock,
       newStock,
+    });
+
+    // Log user activity for inbound/outbound/adjustment
+    const product = await this.productRepository.findOne({ where: { id: dto.productId } });
+    const warehouse = await this.warehouseRepository.findOne({ where: { id: warehouseId } });
+    
+    let activityType: ActivityType;
+    let actionText: string;
+    
+    if (dto.type === TransactionType.INBOUND) {
+      activityType = ActivityType.INVENTORY_RECEIVE;
+      actionText = 'Recibió';
+    } else if (dto.type === TransactionType.OUTBOUND) {
+      activityType = ActivityType.INVENTORY_RECEIVE;
+      actionText = 'Retiró';
+    } else {
+      activityType = ActivityType.INVENTORY_ADJUSTMENT;
+      actionText = 'Ajustó';
+    }
+
+    await loggers.logActivity({
+      companyId,
+      userId,
+      activityType,
+      description: `${actionText} ${Math.abs(adjustedQuantity)} unidades de ${product?.name || 'producto'} en ${warehouse?.name || 'bodega'}`,
+      entityType: 'product',
+      entityId: dto.productId,
+      entityName: product?.name || '',
+      metadata: {
+        warehouseId,
+        warehouseName: warehouse?.name,
+        type: dto.type,
+        reason: dto.reason,
+        quantity: adjustedQuantity,
+        previousStock: currentStock,
+        newStock,
+      },
     });
 
     return transaction;

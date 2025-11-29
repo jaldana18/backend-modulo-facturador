@@ -6,6 +6,7 @@ import { Customer } from '../entities/Customer.entity';
 import { ApiError } from '../middleware/errorHandler.middleware';
 import { loggers } from '../config/logger';
 import { CustomerService } from './CustomerService';
+import { ActivityType } from '../entities/ActivityLog.entity';
 
 export interface CreatePaymentDto {
   saleId: number;
@@ -150,6 +151,24 @@ export class PaymentService {
         saleNumber: sale.saleNumber,
         amount: dto.amount,
         paymentMethodId: dto.paymentMethodId,
+      });
+
+      // Log user activity
+      await loggers.logActivity({
+        companyId,
+        userId,
+        activityType: ActivityType.SALE_PAYMENT_RECEIVED,
+        description: `Registró pago de $${dto.amount.toFixed(2)} para ${sale.saleNumber}`,
+        entityType: 'payment',
+        entityId: payment.id,
+        entityName: payment.paymentNumber,
+        metadata: {
+          saleId: sale.id,
+          saleNumber: sale.saleNumber,
+          amount: dto.amount,
+          paymentMethodId: dto.paymentMethodId,
+          customerId: sale.customerId,
+        },
       });
 
       return payment;

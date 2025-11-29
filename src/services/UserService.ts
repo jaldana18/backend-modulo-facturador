@@ -4,6 +4,7 @@ import { ApiError } from '../middleware/errorHandler.middleware';
 import { loggers } from '../config/logger';
 import { hashPassword } from '../utils/encryption.util';
 import { QueryUsersDto } from '../dto/user/query-users.dto';
+import { ActivityType } from '../entities/ActivityLog.entity';
 
 export interface CreateUserDto {
   email: string;
@@ -80,6 +81,21 @@ export class UserService {
       role: user.role,
     });
 
+    // Log user activity
+    await loggers.logActivity({
+      companyId,
+      userId: createdBy,
+      activityType: ActivityType.USER_CREATE,
+      description: `Creó usuario ${user.firstName} ${user.lastName} (${user.email})`,
+      entityType: 'user',
+      entityId: user.id,
+      entityName: `${user.firstName} ${user.lastName}`,
+      metadata: {
+        email: user.email,
+        role: user.role,
+      },
+    });
+
     // Remove sensitive fields before returning
     delete (user as any).passwordHash;
     delete (user as any).refreshToken;
@@ -118,6 +134,20 @@ export class UserService {
     loggers.logOperation('user_updated', updatedBy, companyId, {
       userId: user.id,
       changes: dto,
+    });
+
+    // Log user activity
+    await loggers.logActivity({
+      companyId,
+      userId: updatedBy,
+      activityType: ActivityType.USER_UPDATE,
+      description: `Actualizó usuario ${user.firstName} ${user.lastName} (${user.email})`,
+      entityType: 'user',
+      entityId: user.id,
+      entityName: `${user.firstName} ${user.lastName}`,
+      metadata: {
+        updatedFields: Object.keys(dto),
+      },
     });
 
     return user;

@@ -6,6 +6,7 @@ import { QueryCustomersDto } from '../dto/customer/query-customers.dto';
 import { ApiError } from '../middleware/errorHandler.middleware';
 import { loggers } from '../config/logger';
 import { PaginatedResponse } from '../common.types';
+import { ActivityType } from '../entities/ActivityLog.entity';
 
 export class CustomerService {
   private customerRepository = AppDataSource.getRepository(Customer);
@@ -129,8 +130,8 @@ export class CustomerService {
       throw new ApiError(409, 'CODE_ALREADY_EXISTS', `Customer code "${code}" already exists`);
     }
 
-    // Create customer
-    const customer = this.customerRepository.create({
+    // Create customer (explicitly excluding id to prevent TypeORM insert issues)
+    const customerData = {
       companyId,
       code,
       documentType: dto.documentType,
@@ -149,7 +150,9 @@ export class CustomerService {
       isActive: true,
       notes: dto.notes || null,
       metadata: dto.metadata ? JSON.stringify(dto.metadata) : null,
-    });
+    };
+
+    const customer = this.customerRepository.create(customerData);
 
     await this.customerRepository.save(customer);
 
@@ -157,6 +160,23 @@ export class CustomerService {
       customerId: customer.id,
       code: customer.code,
       name: customer.name,
+    });
+
+    // Log user activity
+    await loggers.logActivity({
+      companyId,
+      userId,
+      activityType: ActivityType.CUSTOMER_CREATE,
+      description: `Creó cliente ${customer.name} (${customer.code})`,
+      entityType: 'customer',
+      entityId: customer.id,
+      entityName: customer.name,
+      metadata: {
+        code: customer.code,
+        documentType: customer.documentType,
+        documentNumber: customer.documentNumber,
+        customerType: customer.customerType,
+      },
     });
 
     return customer;
@@ -211,6 +231,21 @@ export class CustomerService {
     loggers.logOperation('customer_updated', userId, companyId, {
       customerId: customer.id,
       code: customer.code,
+    });
+
+    // Log user activity
+    await loggers.logActivity({
+      companyId,
+      userId,
+      activityType: ActivityType.CUSTOMER_UPDATE,
+      description: `Actualizó cliente ${customer.name} (${customer.code})`,
+      entityType: 'customer',
+      entityId: customer.id,
+      entityName: customer.name,
+      metadata: {
+        code: customer.code,
+        updatedFields: Object.keys(dto),
+      },
     });
 
     return customer;

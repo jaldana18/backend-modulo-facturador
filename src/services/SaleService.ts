@@ -11,6 +11,7 @@ import { PaginatedResponse } from '../common.types';
 import { CustomerService } from './CustomerService';
 import { InventoryService } from './InventoryService';
 import { TransactionReason } from '../entities/InventoryTransaction.entity';
+import { ActivityType } from '../entities/ActivityLog.entity';
 
 export class SaleService {
   private saleRepository = AppDataSource.getRepository(Sale);
@@ -214,6 +215,23 @@ export class SaleService {
         saleId: sale.id,
         saleNumber: sale.saleNumber,
         total: sale.total,
+      });
+
+      // Log user activity
+      await loggers.logActivity({
+        companyId,
+        userId,
+        activityType: ActivityType.SALE_CREATE,
+        description: `Creó ${sale.saleType === 'invoice' ? 'factura' : 'cotización'} ${sale.saleNumber} por $${sale.total.toFixed(2)}`,
+        entityType: 'sale',
+        entityId: sale.id,
+        entityName: sale.saleNumber,
+        metadata: {
+          saleType: sale.saleType,
+          customerId: sale.customerId,
+          totalAmount: sale.total,
+          itemCount: details.length,
+        },
       });
 
       return sale;
@@ -567,6 +585,22 @@ export class SaleService {
         saleId: sale.id,
         saleNumber: sale.saleNumber,
         inventoryReversed: sale.affectsInventory(),
+      });
+
+      // Log user activity
+      await loggers.logActivity({
+        companyId,
+        userId,
+        activityType: ActivityType.SALE_CANCEL,
+        description: `Canceló ${sale.saleType === 'invoice' ? 'factura' : 'cotización'} ${sale.saleNumber} por $${sale.total.toFixed(2)}`,
+        entityType: 'sale',
+        entityId: sale.id,
+        entityName: sale.saleNumber,
+        metadata: {
+          saleType: sale.saleType,
+          totalAmount: sale.total,
+          inventoryReversed: sale.affectsInventory(),
+        },
       });
 
       return sale;
