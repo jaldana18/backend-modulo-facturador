@@ -7,6 +7,7 @@ import {
   CategoryPerformanceQueryDto,
   ComparisonQueryDto,
   InventoryStatusQueryDto,
+  WarehouseSalesQueryDto,
 } from '../dto/analytics/analytics.dto';
 import { validate } from 'class-validator';
 import { plainToClass } from 'class-transformer';
@@ -401,6 +402,122 @@ export class AnalyticsController {
       res.json(status);
     } catch (error) {
       res.status(500).json({ error: 'Error fetching inventory status' });
+    }
+  }
+
+  /**
+   * @swagger
+   * /api/v1/analytics/sales/by-warehouse:
+   *   get:
+   *     summary: Reporte de ventas por almacén/sucursal
+   *     tags: [Analytics]
+   *     parameters:
+   *       - in: query
+   *         name: startDate
+   *         schema:
+   *           type: string
+   *           format: date
+   *         description: Fecha de inicio (opcional, default últimos 30 días)
+   *       - in: query
+   *         name: endDate
+   *         schema:
+   *           type: string
+   *           format: date
+   *         description: Fecha de fin (opcional, default hoy)
+   *       - in: query
+   *         name: warehouseId
+   *         schema:
+   *           type: integer
+   *         description: Filtrar por almacén específico (opcional)
+   *       - in: query
+   *         name: granularity
+   *         schema:
+   *           type: string
+   *           enum: [day, week, month, year]
+   *         description: Granularidad para agrupación temporal
+   *       - in: query
+   *         name: includeProducts
+   *         schema:
+   *           type: boolean
+   *           default: false
+   *         description: Incluir top 5 productos por almacén
+   *     responses:
+   *       200:
+   *         description: Warehouse sales report
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 warehouses:
+   *                   type: array
+   *                   items:
+   *                     type: object
+   *                     properties:
+   *                       warehouseId:
+   *                         type: integer
+   *                       warehouseName:
+   *                         type: string
+   *                       warehouseCode:
+   *                         type: string
+   *                       totalSales:
+   *                         type: number
+   *                       totalTransactions:
+   *                         type: integer
+   *                       totalQuantitySold:
+   *                         type: number
+   *                       avgTicket:
+   *                         type: number
+   *                       percentageOfTotal:
+   *                         type: number
+   *                       topProducts:
+   *                         type: array
+   *                         items:
+   *                           type: object
+   *                           properties:
+   *                             productId:
+   *                               type: integer
+   *                             name:
+   *                               type: string
+   *                             revenue:
+   *                               type: number
+   *                 summary:
+   *                   type: object
+   *                   properties:
+   *                     totalSales:
+   *                       type: number
+   *                     totalTransactions:
+   *                       type: integer
+   *                     totalWarehouses:
+   *                       type: integer
+   *                     avgSalesPerWarehouse:
+   *                       type: number
+   *                 period:
+   *                   type: object
+   *                   properties:
+   *                     startDate:
+   *                       type: string
+   *                       format: date-time
+   *                     endDate:
+   *                       type: string
+   *                       format: date-time
+   */
+  async getWarehouseSalesReport(req: Request, res: Response): Promise<void> {
+    try {
+      const companyId = (req as any).user.companyId;
+      const query = plainToClass(WarehouseSalesQueryDto, req.query);
+
+      const errors = await validate(query);
+      if (errors.length > 0) {
+        res.status(400).json({ errors });
+        return;
+      }
+
+      const report = await this.analyticsService.getWarehouseSalesReport(companyId, query);
+
+      res.json(report);
+    } catch (error) {
+      res.status(500).json({ error: 'Error fetching warehouse sales report' });
     }
   }
 }

@@ -16,6 +16,7 @@ import saleRoutes from './sale.routes';
 import paymentRoutes from './payment.routes';
 import auditLogRoutes from './audit-log.routes';
 import activityLogRoutes from './activity-log.routes';
+import unitOfMeasureRoutes from './unit-of-measure.routes';
 
 const router = Router();
 
@@ -39,5 +40,6 @@ router.use('/sales', saleRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/audit-logs', auditLogRoutes);
 router.use('/activity-logs', activityLogRoutes);
+router.use('/units-of-measure', unitOfMeasureRoutes);
 
 export default router;

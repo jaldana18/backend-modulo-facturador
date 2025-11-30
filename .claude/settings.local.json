@@ -16,7 +16,8 @@
       "Bash(taskkill:*)",
       "mcp__sequential-thinking__sequentialthinking",
       "Bash(node check-customer-table.js:*)",
-      "Bash(npx ts-node:*)"
+      "Bash(npx ts-node:*)",
+      "Bash(npx tsc:*)"
     ],
     "deny": [],
     "ask": []

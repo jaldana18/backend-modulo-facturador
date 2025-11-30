@@ -177,7 +177,7 @@ export class InventoryService {
     });
 
     // Log user activity for inbound/outbound/adjustment
-    const product = await this.productRepository.findOne({ where: { id: dto.productId } });
+    // Product already fetched at line 73, reuse it
     const warehouse = await this.warehouseRepository.findOne({ where: { id: warehouseId } });
     
     let activityType: ActivityType;

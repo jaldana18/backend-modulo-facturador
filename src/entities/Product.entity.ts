@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Company } from './Company.entity';
 import { Category } from './Category.entity';
+import { UnitOfMeasure } from './UnitOfMeasure.entity';
 import { numericEncryptionTransformer } from '../utils/encryption.util';
 
 @Entity('products')
@@ -47,8 +48,16 @@ export class Product {
   @JoinColumn({ name: 'category_id' })
   categoryRelation: Category | null;
 
+  // Legacy field - kept for backward compatibility, use unitOfMeasureId instead
   @Column({ name: 'unit_of_measure', length: 50 })
   unitOfMeasure: string;
+
+  @Column({ name: 'unit_of_measure_id', nullable: true })
+  unitOfMeasureId: number | null;
+
+  @ManyToOne(() => UnitOfMeasure, (unit) => unit.products)
+  @JoinColumn({ name: 'unit_of_measure_id' })
+  unitOfMeasureRelation: UnitOfMeasure | null;
 
   @Column({
     name: 'minimum_stock',

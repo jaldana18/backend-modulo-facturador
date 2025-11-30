@@ -13,6 +13,7 @@ router.get('/dashboard', analyticsController.getDashboard.bind(analyticsControll
 // Análisis de ventas
 router.get('/sales/timeline', analyticsController.getSalesTimeline.bind(analyticsController));
 router.get('/sales/comparison', analyticsController.comparePeriods.bind(analyticsController));
+router.get('/sales/by-warehouse', analyticsController.getWarehouseSalesReport.bind(analyticsController));
 
 // Análisis de productos
 router.get('/products/top-selling', analyticsController.getTopSellingProducts.bind(analyticsController));

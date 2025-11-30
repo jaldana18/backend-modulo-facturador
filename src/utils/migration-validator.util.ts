@@ -302,10 +302,7 @@ export class MigrationValidator {
       );
     }
 
-    logger.info('✅ Schema validation passed - all entities are in sync', {
-      type: 'schema_validation_success',
-      totalTables: result.summary.totalTables,
-    });
+    // Silent success - schema validation passed
   }
 
   /**
@@ -322,12 +319,8 @@ export class MigrationValidator {
         differences: result.differences,
       });
       console.warn('\n' + report + '\n');
-    } else {
-      logger.info('✅ Schema validation passed - all entities are in sync', {
-        type: 'schema_validation_success',
-        totalTables: result.summary.totalTables,
-      });
     }
+    // Silent success - schema is valid
 
     return result;
   }

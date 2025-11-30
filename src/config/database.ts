@@ -13,7 +13,7 @@ const dataSourceOptions: DataSourceOptions = {
   password: config.database.password,
   database: config.database.database,
   synchronize: false, // NEVER use true in production
-  logging: config.nodeEnv === 'development' ? ['query', 'error'] : ['error'],
+  logging: ['error'], // Only log errors, not queries
   entities: [path.join(__dirname, '../entities/**/*.entity{.ts,.js}')],
   migrations: [path.join(__dirname, '../migrations/**/*{.ts,.js}')],
   subscribers: [],
@@ -53,29 +53,26 @@ export const initializeDatabase = async (options?: {
 
   try {
     await AppDataSource.initialize();
-    console.log('✅ Database connection established successfully');
+    console.log('✅ Database connected');
 
     // Run pending migrations automatically if enabled
     if (runMigrations) {
-      console.log('🔄 Checking for pending migrations...');
       const result = await runAutoMigrations(
         AppDataSource,
         config.migrations.forceInProduction
       );
 
       if (!result.success && config.nodeEnv === 'production') {
-        console.warn('⚠️ Migration execution skipped in production for safety');
-        console.warn('Run migrations manually with: npm run migration:run');
+        console.warn('⚠️ Migrations skipped in production. Run manually: npm run migration:run');
       }
     }
 
     // Validate schema if enabled
     if (validateSchema) {
-      console.log('🔍 Validating database schema...');
       await validateMigrations(AppDataSource, strictValidation);
     }
   } catch (error) {
-    console.error('❌ Error connecting to database:', error);
+    console.error('❌ Database connection failed:', error);
     throw error;
   }
 };
