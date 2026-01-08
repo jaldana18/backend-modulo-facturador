@@ -3,10 +3,11 @@ import { Category } from '../entities/Category.entity';
 import { UnitOfMeasure } from '../entities/UnitOfMeasure.entity';
 import { Company } from '../entities/Company.entity';
 import { logger } from '../config/logger';
+import { IsNull } from 'typeorm';
 
 /**
  * Seed catalog data (categories and units of measure)
- * This creates standard categories and units for all companies or specific company
+ * This creates global categories and units shared by all companies
  */
 export const seedCatalogData = async (companyId?: number) => {
   try {
@@ -16,36 +17,15 @@ export const seedCatalogData = async (companyId?: number) => {
 
     const categoryRepo = AppDataSource.getRepository(Category);
     const unitRepo = AppDataSource.getRepository(UnitOfMeasure);
-    const companyRepo = AppDataSource.getRepository(Company);
 
-    let companies: Company[];
+    logger.info('🌱 Seeding global catalog data (categories and units of measure)...');
 
-    if (companyId) {
-      const company = await companyRepo.findOne({ where: { id: companyId } });
-      if (!company) {
-        throw new Error(`Company with ID ${companyId} not found`);
-      }
-      companies = [company];
-    } else {
-      companies = await companyRepo.find({ where: { isActive: true } });
-    }
+    // Check if global categories already exist
+    const existingCategories = await categoryRepo.count({ where: { companyId: IsNull() } });
+    if (existingCategories === 0) {
+      logger.info('📁 Creating global categories...');
 
-    if (companies.length === 0) {
-      logger.warn('⚠️ No companies found. Please create a company first.');
-      return;
-    }
-
-    logger.info('🌱 Seeding catalog data (categories and units of measure)...');
-
-    for (const company of companies) {
-      logger.info(`📦 Processing company: ${company.name} (ID: ${company.id})`);
-
-      // Check if categories already exist
-      const existingCategories = await categoryRepo.count({ where: { companyId: company.id } });
-      if (existingCategories === 0) {
-        logger.info('📁 Creating categories...');
-
-        const categories = [
+      const categories = [
           {
             name: 'Electronics',
             description: 'Electronic devices and components',
@@ -118,25 +98,25 @@ export const seedCatalogData = async (companyId?: number) => {
           },
         ];
 
-        for (const categoryData of categories) {
-          const category = categoryRepo.create({
-            companyId: company.id,
-            ...categoryData,
-            isActive: true,
-          });
-          await categoryRepo.save(category);
-          logger.info(`   ✅ Created category: ${category.name}`);
-        }
-
-        logger.info(`✅ Created ${categories.length} categories for ${company.name}`);
-      } else {
-        logger.info(`✅ Categories already exist for ${company.name}, skipping...`);
+      for (const categoryData of categories) {
+        const category = categoryRepo.create({
+          companyId: null, // Global category
+          ...categoryData,
+          isActive: true,
+        });
+        await categoryRepo.save(category);
+        logger.info(`   ✅ Created category: ${category.name}`);
       }
 
-      // Check if units of measure already exist
-      const existingUnits = await unitRepo.count({ where: { companyId: company.id } });
-      if (existingUnits === 0) {
-        logger.info('📏 Creating units of measure...');
+      logger.info(`✅ Created ${categories.length} global categories`);
+    } else {
+      logger.info(`✅ Global categories already exist, skipping...`);
+    }
+
+    // Check if global units of measure already exist
+    const existingUnits = await unitRepo.count({ where: { companyId: IsNull() } });
+    if (existingUnits === 0) {
+      logger.info('📏 Creating global units of measure...');
 
         const units = [
           // Base units
@@ -196,18 +176,19 @@ export const seedCatalogData = async (companyId?: number) => {
           },
         ];
 
-        const savedUnits: { [key: string]: UnitOfMeasure } = {};
+        const savedUnits: { [key: string]: number } = {};
 
-        // Save base units first
+        // Save base units first using direct SQL query (column doesn't have IDENTITY)
+        let currentId = 1;
         for (const unitData of units) {
-          const unit = unitRepo.create({
-            companyId: company.id,
-            ...unitData,
-            isActive: true,
-          });
-          const savedUnit = await unitRepo.save(unit);
-          savedUnits[unitData.code] = savedUnit;
-          logger.info(`   ✅ Created unit: ${unit.code} - ${unit.name}`);
+          await unitRepo.query(`
+            INSERT INTO unit_of_measures (id, company_id, code, name, description, symbol, is_base_unit, base_unit_id, conversion_factor, is_active, created_at, updated_at)
+            VALUES (@0, @1, @2, @3, @4, @5, @6, @7, @8, @9, GETDATE(), GETDATE())
+          `, [currentId, null, unitData.code, unitData.name, unitData.description, unitData.symbol, unitData.isBaseUnit, unitData.baseUnitId, unitData.conversionFactor, true]);
+          
+          savedUnits[unitData.code] = currentId;
+          logger.info(`   ✅ Created unit: ${unitData.code} - ${unitData.name}`);
+          currentId++;
         }
 
         // Derived units with conversions
@@ -306,14 +287,13 @@ export const seedCatalogData = async (companyId?: number) => {
 
         for (const unitData of derivedUnits) {
           const { baseUnitCode, ...rest } = unitData;
-          const unit = unitRepo.create({
-            companyId: company.id,
-            ...rest,
-            baseUnitId: savedUnits[baseUnitCode].id,
-            isActive: true,
-          });
-          await unitRepo.save(unit);
-          logger.info(`   ✅ Created unit: ${unit.code} - ${unit.name}`);
+          await unitRepo.query(`
+            INSERT INTO unit_of_measures (id, company_id, code, name, description, symbol, is_base_unit, base_unit_id, conversion_factor, is_active, created_at, updated_at)
+            VALUES (@0, @1, @2, @3, @4, @5, @6, @7, @8, @9, GETDATE(), GETDATE())
+          `, [currentId, null, rest.code, rest.name, rest.description, rest.symbol, rest.isBaseUnit, savedUnits[baseUnitCode], rest.conversionFactor, true]);
+          
+          logger.info(`   ✅ Created unit: ${rest.code} - ${rest.name}`);
+          currentId++;
         }
 
         // Package units (for business)
@@ -385,24 +365,23 @@ export const seedCatalogData = async (companyId?: number) => {
 
         for (const unitData of packageUnits) {
           const { baseUnitCode, ...rest } = unitData as any;
-          const unit = unitRepo.create({
-            companyId: company.id,
-            ...rest,
-            baseUnitId: baseUnitCode ? savedUnits[baseUnitCode]?.id : null,
-            isActive: true,
-          });
-          await unitRepo.save(unit);
-          logger.info(`   ✅ Created unit: ${unit.code} - ${unit.name}`);
+          const baseId = baseUnitCode ? savedUnits[baseUnitCode] : null;
+          await unitRepo.query(`
+            INSERT INTO unit_of_measures (id, company_id, code, name, description, symbol, is_base_unit, base_unit_id, conversion_factor, is_active, created_at, updated_at)
+            VALUES (@0, @1, @2, @3, @4, @5, @6, @7, @8, @9, GETDATE(), GETDATE())
+          `, [currentId, null, rest.code, rest.name, rest.description, rest.symbol, rest.isBaseUnit, baseId, rest.conversionFactor, true]);
+          
+          logger.info(`   ✅ Created unit: ${rest.code} - ${rest.name}`);
+          currentId++;
         }
 
         const totalUnits = units.length + derivedUnits.length + packageUnits.length;
-        logger.info(`✅ Created ${totalUnits} units of measure for ${company.name}`);
-      } else {
-        logger.info(`✅ Units of measure already exist for ${company.name}, skipping...`);
-      }
+        logger.info(`✅ Created ${totalUnits} global units of measure`);
+    } else {
+      logger.info(`✅ Global units of measure already exist, skipping...`);
     }
 
-    logger.info('🎉 Catalog data seeded successfully!');
+    logger.info('🎉 Global catalog data seeded successfully!');
   } catch (error) {
     logger.error('❌ Error seeding catalog data:', error);
     throw error;

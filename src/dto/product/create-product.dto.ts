@@ -64,4 +64,13 @@ export class CreateProductDto {
 
   @IsOptional()
   metadata?: any; // Will be stringified to JSON
+
+  @IsOptional()
+  @IsNumber({}, { message: 'Initial stock must be a number' })
+  @Min(0, { message: 'Initial stock must be at least 0' })
+  initialStock?: number;
+
+  @IsOptional()
+  @IsNumber({}, { message: 'Warehouse ID must be a number' })
+  warehouseId?: number;
 }

@@ -9,18 +9,21 @@ export class PaymentMethodService {
   private paymentMethodRepository = AppDataSource.getRepository(PaymentMethod);
 
   /**
-   * Get all payment methods for a company
+   * Get all payment methods (global and company-specific)
    */
   async getPaymentMethods(companyId: number, activeOnly: boolean = false): Promise<PaymentMethod[]> {
-    const where: any = { companyId };
+    const queryBuilder = this.paymentMethodRepository.createQueryBuilder('pm');
+
+    // Include global (companyId = NULL) and company-specific methods
+    queryBuilder.where('(pm.companyId IS NULL OR pm.companyId = :companyId)', { companyId });
+
     if (activeOnly) {
-      where.isActive = true;
+      queryBuilder.andWhere('pm.isActive = :isActive', { isActive: true });
     }
 
-    return this.paymentMethodRepository.find({
-      where,
-      order: { name: 'ASC' },
-    });
+    return queryBuilder
+      .orderBy('pm.name', 'ASC')
+      .getMany();
   }
 
   /**

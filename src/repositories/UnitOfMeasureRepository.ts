@@ -106,23 +106,30 @@ export class UnitOfMeasureRepository {
 
   /**
    * Find all active units (for dropdowns)
+   * Includes global units (companyId = NULL) and company-specific units
    */
   async findActive(companyId: number): Promise<UnitOfMeasure[]> {
-    return this.repository.find({
-      where: { companyId, isActive: true },
-      order: { code: 'ASC' },
-      relations: ['baseUnit'],
-    });
+    return this.repository
+      .createQueryBuilder('unit')
+      .leftJoinAndSelect('unit.baseUnit', 'baseUnit')
+      .where('unit.isActive = :isActive', { isActive: true })
+      .andWhere('(unit.company_id IS NULL OR unit.company_id = :companyId)', { companyId })
+      .orderBy('unit.code', 'ASC')
+      .getMany();
   }
 
   /**
    * Find base units only
+   * Includes global units (companyId = NULL) and company-specific units
    */
   async findBaseUnits(companyId: number): Promise<UnitOfMeasure[]> {
-    return this.repository.find({
-      where: { companyId, isActive: true, isBaseUnit: true },
-      order: { code: 'ASC' },
-    });
+    return this.repository
+      .createQueryBuilder('unit')
+      .where('unit.isActive = :isActive', { isActive: true })
+      .andWhere('unit.isBaseUnit = :isBaseUnit', { isBaseUnit: true })
+      .andWhere('(unit.company_id IS NULL OR unit.company_id = :companyId)', { companyId })
+      .orderBy('unit.code', 'ASC')
+      .getMany();
   }
 
   /**

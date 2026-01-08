@@ -1,5 +1,5 @@
 import { AppDataSource } from '../config/database';
-import { Sale, SaleStatus, SaleType } from '../entities/Sale.entity';
+import { Sale, SaleStatus, SaleType, DiscountType } from '../entities/Sale.entity';
 import { SaleDetail } from '../entities/SaleDetail.entity';
 import { Product } from '../entities/Product.entity';
 import { CreateSaleDto } from '../dto/sale/create-sale.dto';
@@ -19,6 +19,45 @@ export class SaleService {
   private productRepository = AppDataSource.getRepository(Product);
   private customerService = new CustomerService();
   private inventoryService = new InventoryService();
+
+  /**
+   * Validate discount configuration
+   */
+  private validateDiscount(dto: CreateSaleDto | UpdateSaleDto): void {
+    if (!dto.discountType || dto.discountType === DiscountType.NONE) {
+      return; // No discount, no validation needed
+    }
+
+    if (dto.discountType === DiscountType.PERCENTAGE) {
+      if (dto.discountPercentage === undefined || dto.discountPercentage === null) {
+        throw new ApiError(
+          400,
+          'MISSING_DISCOUNT_PERCENTAGE',
+          'Discount percentage is required when discount type is percentage'
+        );
+      }
+      if (dto.discountPercentage < 0 || dto.discountPercentage > 100) {
+        throw new ApiError(
+          400,
+          'INVALID_DISCOUNT_PERCENTAGE',
+          'Discount percentage must be between 0 and 100'
+        );
+      }
+    }
+
+    if (dto.discountType === DiscountType.FIXED) {
+      if (dto.discountAmount === undefined || dto.discountAmount === null) {
+        throw new ApiError(
+          400,
+          'MISSING_DISCOUNT_AMOUNT',
+          'Discount amount is required when discount type is fixed'
+        );
+      }
+      if (dto.discountAmount < 0) {
+        throw new ApiError(400, 'INVALID_DISCOUNT_AMOUNT', 'Discount amount must be at least 0');
+      }
+    }
+  }
 
   /**
    * Generate unique sale number
@@ -144,6 +183,9 @@ export class SaleService {
    * Create sale in draft status
    */
   async createSale(companyId: number, userId: number, dto: CreateSaleDto): Promise<Sale> {
+    // Validate discount configuration
+    this.validateDiscount(dto);
+
     // Verify customer exists
     await this.customerService.getCustomerById(companyId, dto.customerId);
 
@@ -173,7 +215,10 @@ export class SaleService {
         saleDate: dto.saleDate ? new Date(dto.saleDate) : new Date(),
         dueDate: dto.dueDate ? new Date(dto.dueDate) : null,
         taxPercentage: dto.taxPercentage !== undefined ? dto.taxPercentage : 19,
+        discountType: dto.discountType || DiscountType.NONE,
+        discountPercentage: dto.discountPercentage || 0,
         discountAmount: dto.discountAmount || 0,
+        discountReason: dto.discountReason || null,
         referenceSaleId: dto.referenceSaleId || null,
         notes: dto.notes || null,
         metadata: dto.metadata ? JSON.stringify(dto.metadata) : null,
@@ -247,6 +292,11 @@ export class SaleService {
     saleId: number,
     dto: UpdateSaleDto
   ): Promise<Sale> {
+    // Validate discount configuration if provided
+    if (dto.discountType !== undefined) {
+      this.validateDiscount(dto);
+    }
+
     const sale = await this.getSaleById(companyId, saleId);
 
     if (!sale.isDraft()) {
@@ -257,7 +307,10 @@ export class SaleService {
     if (dto.saleDate !== undefined) sale.saleDate = new Date(dto.saleDate);
     if (dto.dueDate !== undefined) sale.dueDate = dto.dueDate ? new Date(dto.dueDate) : null;
     if (dto.taxPercentage !== undefined) sale.taxPercentage = dto.taxPercentage;
+    if (dto.discountType !== undefined) sale.discountType = dto.discountType;
+    if (dto.discountPercentage !== undefined) sale.discountPercentage = dto.discountPercentage;
     if (dto.discountAmount !== undefined) sale.discountAmount = dto.discountAmount;
+    if (dto.discountReason !== undefined) sale.discountReason = dto.discountReason || null;
     if (dto.notes !== undefined) sale.notes = dto.notes || null;
     if (dto.metadata !== undefined) {
       sale.metadata = dto.metadata ? JSON.stringify(dto.metadata) : null;

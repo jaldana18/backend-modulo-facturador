@@ -43,6 +43,12 @@ export enum PaymentStatus {
   OVERDUE = 'overdue', // Vencido
 }
 
+export enum DiscountType {
+  NONE = 'none', // Sin descuento
+  PERCENTAGE = 'percentage', // Descuento porcentual
+  FIXED = 'fixed', // Descuento fijo en monto
+}
+
 @Entity('sales')
 @Index(['companyId', 'saleNumber'], { unique: true })
 @Index(['companyId', 'status'])
@@ -125,6 +131,33 @@ export class Sale {
     default: 0,
   })
   discountAmount: number;
+
+  @Column({
+    name: 'discount_type',
+    type: 'varchar',
+    length: '20',
+    default: DiscountType.NONE,
+    nullable: true,
+  })
+  discountType: DiscountType;
+
+  @Column({
+    name: 'discount_percentage',
+    type: 'decimal',
+    precision: 5,
+    scale: 2,
+    default: 0,
+    nullable: true,
+  })
+  discountPercentage: number;
+
+  @Column({
+    name: 'discount_reason',
+    type: 'nvarchar',
+    length: '500',
+    nullable: true,
+  })
+  discountReason: string | null;
 
   @Column({
     type: 'decimal',
@@ -223,6 +256,15 @@ export class Sale {
   // Calcula totales
   calculateTotals(): void {
     // El subtotal debe calcularse desde los detalles
+    // Calcular descuento según tipo
+    if (this.discountType === DiscountType.PERCENTAGE && this.discountPercentage) {
+      this.discountAmount = (this.subtotal * this.discountPercentage) / 100;
+    } else if (this.discountType === DiscountType.FIXED) {
+      // discountAmount ya está establecido
+    } else {
+      this.discountAmount = 0;
+    }
+
     this.taxAmount = (this.subtotal * this.taxPercentage) / 100;
     this.total = this.subtotal + this.taxAmount - this.discountAmount;
     this.balance = this.total - this.paidAmount;

@@ -19,12 +19,12 @@ export class UnitOfMeasure {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: 'company_id' })
-  companyId: number;
+  @Column({ name: 'company_id', nullable: true })
+  companyId: number | null;
 
-  @ManyToOne(() => Company)
+  @ManyToOne(() => Company, { nullable: true })
   @JoinColumn({ name: 'company_id' })
-  company: Company;
+  company: Company | null;
 
   @Column({ length: 20 })
   code: string; // e.g., "KG", "L", "M", "UNIT", "BOX"

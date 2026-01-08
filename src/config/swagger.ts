@@ -360,6 +360,17 @@ Role-based warehouse access:
               description: 'URL or relative path to product image',
               example: '/uploads/products/company-1/550e8400-e29b-41d4-a716-446655440000.jpg'
             },
+            initialStock: {
+              type: 'number',
+              minimum: 0,
+              description: 'Initial stock quantity (optional). If provided, an ADJUSTMENT transaction will be created.',
+              example: 100,
+            },
+            warehouseId: {
+              type: 'number',
+              description: 'Warehouse ID for initial stock (optional). If not provided, the default warehouse will be used.',
+              example: 1,
+            },
             metadata: {
               type: 'object',
               description: 'Additional metadata',
@@ -1475,6 +1486,96 @@ Role-based warehouse access:
             },
           },
         },
+        // Audit Log schemas
+        AuditLog: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: 'Audit log ID',
+            },
+            companyId: {
+              type: 'integer',
+              description: 'Company ID',
+            },
+            userId: {
+              type: 'integer',
+              nullable: true,
+              description: 'User ID who performed the action',
+            },
+            user: {
+              type: 'object',
+              description: 'User who performed the action',
+              properties: {
+                id: { type: 'integer' },
+                email: { type: 'string' },
+                firstName: { type: 'string' },
+                lastName: { type: 'string' },
+              },
+            },
+            action: {
+              type: 'string',
+              description: 'Action type (CREATE, UPDATE, DELETE, ACTIVATE, etc.)',
+              example: 'CREATE',
+            },
+            entityType: {
+              type: 'string',
+              description: 'Entity type (Product, User, Customer, etc.)',
+              example: 'Product',
+            },
+            entityId: {
+              type: 'integer',
+              nullable: true,
+              description: 'ID of the affected entity',
+            },
+            description: {
+              type: 'string',
+              description: 'Human-readable description of the action',
+              example: 'Usuario creó producto \'Laptop Dell XPS 15\' (SKU: PROD-001)',
+            },
+            ipAddress: {
+              type: 'string',
+              nullable: true,
+              description: 'IP address of the user',
+            },
+            userAgent: {
+              type: 'string',
+              nullable: true,
+              description: 'User agent string',
+            },
+            oldValues: {
+              type: 'string',
+              nullable: true,
+              description: 'Previous values before change (JSON string)',
+            },
+            newValues: {
+              type: 'string',
+              nullable: true,
+              description: 'New values after change (JSON string)',
+            },
+            metadata: {
+              type: 'string',
+              nullable: true,
+              description: 'Additional metadata (JSON string)',
+            },
+            severity: {
+              type: 'string',
+              enum: ['info', 'warning', 'critical'],
+              description: 'Severity level of the action',
+            },
+            module: {
+              type: 'string',
+              nullable: true,
+              description: 'Module where action occurred',
+              example: 'inventory',
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Timestamp when action was performed',
+            },
+          },
+        },
       },
     },
     security: [
@@ -1522,6 +1623,10 @@ Role-based warehouse access:
       {
         name: 'Categories',
         description: 'Product category management endpoints',
+      },
+      {
+        name: 'Audit Logs Database',
+        description: 'Database-backed audit log endpoints for tracking all user actions with optimized queries and filtering',
       },
     ],
   },

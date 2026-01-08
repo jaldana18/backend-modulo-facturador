@@ -3,6 +3,7 @@ import {
   IsNotEmpty,
   IsOptional,
   Min,
+  Max,
 } from 'class-validator';
 
 export class CreateSaleDetailDto {
@@ -28,5 +29,6 @@ export class CreateSaleDetailDto {
   @IsOptional()
   @IsNumber({}, { message: 'Discount percentage must be a number' })
   @Min(0, { message: 'Discount percentage must be at least 0' })
+  @Max(100, { message: 'Discount percentage cannot exceed 100%' })
   discountPercentage?: number;
 }

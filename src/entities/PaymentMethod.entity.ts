@@ -17,14 +17,17 @@ export class PaymentMethod {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: 'company_id' })
-  companyId: number;
+  @Column({ name: 'company_id', nullable: true })
+  companyId: number | null;
 
   @Column({ type: 'nvarchar', length: '100' })
   name: string; // Efectivo, Tarjeta, Transferencia, etc.
 
   @Column({ type: 'nvarchar', length: '50' })
   code: string; // cash, card, transfer, check, etc.
+
+  @Column({ type: 'nvarchar', length: '100', nullable: true })
+  channel: string | null; // Canal/billetera: nequi, daviplata, bancolombia, etc.
 
   @Column({ name: 'requires_reference', default: false })
   requiresReference: boolean; // Si requiere número de referencia
