@@ -1,4 +1,5 @@
 import * as XLSX from 'xlsx';
+import * as ExcelJS from 'exceljs';
 import { AppDataSource } from '../config/database';
 import { Product } from '../entities/Product.entity';
 import { Warehouse } from '../entities/Warehouse.entity';
@@ -397,13 +398,13 @@ export class BulkInventoryService {
    */
   private mapExcelRowToDto(row: any, rowNumber: number): BulkUploadInventoryDto {
     const dto = plainToClass(BulkUploadInventoryDto, {
-      sku: this.getColumnValue(row, ['sku', 'SKU', 'código', 'codigo']),
+      sku: this.getColumnValue(row, ['sku', 'SKU', 'sku *', 'SKU *', 'código', 'codigo']),
       productName: this.getColumnValue(row, [
         'productName',
         'product_name',
-        'nombre',
-        'nombre del producto',
+        'nombre producto **',
         'nombre producto',
+        'nombre del producto',
         'producto',
         'name',
       ]),
@@ -427,12 +428,12 @@ export class BulkInventoryService {
       ),
       description: this.getColumnValue(row, ['description', 'descripción', 'descripcion']),
       quantity: this.parseNumber(
-        this.getColumnValue(row, ['quantity', 'cantidad', 'qty'])
+        this.getColumnValue(row, ['quantity', 'cantidad', 'cantidad *', 'qty'])
       ),
       unitCost: this.parseNumber(
-        this.getColumnValue(row, ['unitCost', 'unit_cost', 'costo unitario', 'costo', 'cost'])
+        this.getColumnValue(row, ['unitCost', 'unit_cost', 'costo unitario', 'costo unitario *', 'costo', 'cost'])
       ),
-      lotNumber: this.getColumnValue(row, ['lotNumber', 'lot_number', 'lote', 'número de lote']),
+      lotNumber: this.getColumnValue(row, ['lotNumber', 'lot_number', 'número de lote', 'lote']),
       expiryDate: this.getColumnValue(row, [
         'expiryDate',
         'expiry_date',
@@ -519,21 +520,17 @@ export class BulkInventoryService {
   }
 
   /**
-   * Generate Excel template for bulk inventory upload
+   * Generate Excel template for bulk inventory upload with colors using ExcelJS
    */
-  generateTemplate(): Buffer {
-    const wb = XLSX.utils.book_new();
+  async generateTemplate(): Promise<Buffer> {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Inventario');
 
-    // Define headers with new product fields
+    // Define headers with clear indication of required fields
     const headers = [
-      'SKU',
-      'Nombre Producto',
-      'Categoría',
-      'Unidad de Medida',
-      'Precio de Venta',
-      'Descripción',
-      'Cantidad',
-      'Costo Unitario',
+      'SKU *',
+      'Cantidad *',
+      'Costo Unitario *',
       'Número de Lote',
       'Fecha de Vencimiento',
       'Almacén',
@@ -541,115 +538,285 @@ export class BulkInventoryService {
       'Referencia/OC',
       'Ubicación',
       'Notas',
+      '--- SEPARADOR ---',
+      'Nombre Producto **',
+      'Categoría',
+      'Unidad de Medida',
+      'Precio de Venta',
+      'Descripción',
     ];
 
-    // Sample data with product information
+    // Add headers
+    worksheet.addRow(headers);
+
+    // Sample data rows
     const sampleData = [
-      [
-        'PROD-001',
-        'Producto Ejemplo 1',
-        'Electrónica',
-        'unidad',
-        75000,
-        'Producto de ejemplo para carga masiva',
-        100,
-        50000,
-        'LOTE-2025-001',
-        '2026-12-31',
-        'WH-001',
-        'Proveedor ABC',
-        'OC-12345',
-        'Estante A-1',
-        'Pedido de enero',
-      ],
-      [
-        'PROD-002',
-        'Producto Ejemplo 2',
-        'Hogar',
-        'caja',
-        180000,
-        '',
-        50,
-        120000,
-        'LOTE-2025-002',
-        '',
-        'WH-001',
-        'Proveedor XYZ',
-        'OC-12346',
-        'Estante B-3',
-        '',
-      ],
+      ['PROD-001', 100, 50000, 'LOTE-2025-001', '2026-12-31', 'WH-001', 'Proveedor ABC', 'OC-12345', 'Estante A-1', 'Pedido de enero', '', 'Laptop Dell', 'Electrónica', 'unidad', 75000, 'Laptop profesional'],
+      ['PROD-002', 50, 120000, 'LOTE-2025-002', '', 'WH-001', 'Proveedor XYZ', 'OC-12346', 'Estante B-3', '', '', 'Mouse Logitech', 'Electrónica', 'unidad', 180000, 'Mouse inalámbrico'],
+      ['PROD-003', 200, 15000, '', '', '', 'Proveedor ABC', 'OC-12347', '', 'Compra urgente', '', '', '', '', '', ''],
     ];
 
-    const wsData = [headers, ...sampleData];
-    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    sampleData.forEach(row => worksheet.addRow(row));
 
-    // Adjust column widths for better readability
-    ws['!cols'] = [
-      { wch: 15 }, // SKU
-      { wch: 25 }, // Nombre Producto
-      { wch: 15 }, // Categoría
-      { wch: 18 }, // Unidad de Medida
-      { wch: 18 }, // Precio de Venta
-      { wch: 30 }, // Descripción
-      { wch: 12 }, // Cantidad
-      { wch: 15 }, // Costo Unitario
-      { wch: 18 }, // Número de Lote
-      { wch: 20 }, // Fecha de Vencimiento
-      { wch: 12 }, // Almacén
-      { wch: 20 }, // Proveedor
-      { wch: 18 }, // Referencia/OC
-      { wch: 15 }, // Ubicación
-      { wch: 30 }, // Notas
+    // Set column widths
+    worksheet.columns = [
+      { width: 18 }, // SKU *
+      { width: 15 }, // Cantidad *
+      { width: 18 }, // Costo Unitario *
+      { width: 18 }, // Número de Lote
+      { width: 20 }, // Fecha de Vencimiento
+      { width: 15 }, // Almacén
+      { width: 20 }, // Proveedor
+      { width: 18 }, // Referencia/OC
+      { width: 15 }, // Ubicación
+      { width: 30 }, // Notas
+      { width: 5 },  // Separador
+      { width: 25 }, // Nombre Producto **
+      { width: 15 }, // Categoría
+      { width: 18 }, // Unidad de Medida
+      { width: 18 }, // Precio de Venta
+      { width: 30 }, // Descripción
     ];
 
-    XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
+    // Style header row with colors
+    const headerRow = worksheet.getRow(1);
+    headerRow.height = 35;
+    headerRow.font = { bold: true, size: 11 };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+
+    headers.forEach((header, index) => {
+      const cell = headerRow.getCell(index + 1);
+      
+      if (header.includes('*') && !header.includes('**')) {
+        // Required fields - Red background
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFFCCCC' }
+        };
+        cell.font = { bold: true, color: { argb: 'FFCC0000' }, size: 11 };
+      } else if (header.includes('**')) {
+        // Conditional required - Orange background
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFFFE5CC' }
+        };
+        cell.font = { bold: true, color: { argb: 'FFCC6600' }, size: 11 };
+      } else if (header.includes('---')) {
+        // Separator - Gray background
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFCCCCCC' }
+        };
+        cell.font = { bold: true, size: 10 };
+      } else if (index >= 11) {
+        // Product creation fields - Light blue
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFCCE5FF' }
+        };
+        cell.font = { bold: true, color: { argb: 'FF0066CC' }, size: 11 };
+      } else {
+        // Optional fields - Light green
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFCCFFCC' }
+        };
+        cell.font = { bold: false, size: 11 };
+      }
+      
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' }
+      };
+    });
+
+    // Instructions sheet with color-coded legend
+    const instructionsData = [
+      ['📦 INSTRUCCIONES PARA CARGA MASIVA DE INVENTARIO'],
+      [''],
+      ['═══════════════════════════════════════════════════════════════════════════════════'],
+      ['🎯 PROPÓSITO'],
+      ['Esta plantilla es para REGISTRAR ENTRADAS DE MERCANCÍA (compras/recepciones de inventario)'],
+      [''],
+      ['═══════════════════════════════════════════════════════════════════════════════════'],
+      ['🎨 CÓDIGO DE COLORES DE LA PLANTILLA'],
+      [''],
+      ['  🔴 ROJO (*)          → Campos OBLIGATORIOS - Siempre requeridos'],
+      ['  🟠 NARANJA (**)      → Campos CONDICIONALES - Solo si el producto NO existe'],
+      ['  🟢 VERDE            → Campos OPCIONALES - Información adicional útil'],
+      ['  🔵 AZUL             → Campos de PRODUCTO - Para crear productos automáticamente'],
+      [''],
+      ['═══════════════════════════════════════════════════════════════════════════════════'],
+      ['✅ CAMPOS OBLIGATORIOS (Columnas con fondo ROJO)'],
+      [''],
+      ['  1. SKU *                  → Código único del producto (debe existir en el sistema)'],
+      ['                              Ejemplo: PROD-001, LAP-DELL-XPS'],
+      [''],
+      ['  2. Cantidad *             → Unidades que ingresan al inventario (número > 0)'],
+      ['                              Ejemplo: 100, 25.5'],
+      [''],
+      ['  3. Costo Unitario *       → Precio de compra por unidad (número > 0)'],
+      ['                              Ejemplo: 50000, 125.99'],
+      [''],
+      ['═══════════════════════════════════════════════════════════════════════════════════'],
+      ['⚠️ CAMPOS CONDICIONALES (Columnas con fondo NARANJA)'],
+      [''],
+      ['  Nombre Producto **        → OBLIGATORIO solo si el producto NO existe y autoCreateProducts=true'],
+      ['                              Si el SKU ya existe en el sistema, este campo se IGNORA'],
+      ['                              Ejemplo: Laptop Dell XPS 15'],
+      [''],
+      ['═══════════════════════════════════════════════════════════════════════════════════'],
+      ['📝 CAMPOS OPCIONALES (Columnas con fondo VERDE)'],
+      [''],
+      ['  Número de Lote            → Identificador del lote del proveedor'],
+      ['                              Ejemplo: LOTE-2025-001, BATCH-ABC123'],
+      ['                              Útil para: Trazabilidad, control de calidad'],
+      [''],
+      ['  Fecha de Vencimiento      → Fecha de expiración (formato: YYYY-MM-DD o DD/MM/YYYY)'],
+      ['                              Ejemplo: 2026-12-31, 31/12/2026'],
+      ['                              Útil para: Medicinas, alimentos, productos perecederos'],
+      [''],
+      ['  Almacén                   → Código del almacén destino'],
+      ['                              Ejemplo: WH-001, BODEGA-PRINCIPAL'],
+      ['                              Si no se especifica: usa el almacén principal'],
+      [''],
+      ['  Proveedor                 → Nombre del proveedor/fabricante'],
+      ['                              Ejemplo: Proveedor ABC, Samsung Colombia'],
+      [''],
+      ['  Referencia/OC             → Número de orden de compra o factura'],
+      ['                              Ejemplo: OC-12345, FC-001234'],
+      ['                              Útil para: Auditoría, conciliación contable'],
+      [''],
+      ['  Ubicación                 → Ubicación física dentro del almacén'],
+      ['                              Ejemplo: A-15-B (Pasillo A, Estante 15, Nivel B)'],
+      ['                              Útil para: Facilitar picking, organización'],
+      [''],
+      ['  Notas                     → Observaciones adicionales sobre esta entrada'],
+      ['                              Ejemplo: Producto defectuoso, Promoción del proveedor'],
+      [''],
+      ['═══════════════════════════════════════════════════════════════════════════════════'],
+      ['🆕 CAMPOS DE CREACIÓN DE PRODUCTOS (Columnas con fondo AZUL)'],
+      [''],
+      ['Estos campos SOLO se usan cuando el producto NO existe y autoCreateProducts=true'],
+      ['Si el producto YA existe, estos campos se IGNORAN completamente'],
+      [''],
+      ['  Categoría                 → Clasificación del producto'],
+      ['                              Ejemplo: Electrónica, Ferretería, Alimentos'],
+      [''],
+      ['  Unidad de Medida          → Cómo se mide/vende el producto'],
+      ['                              Ejemplo: unidad, caja, kg, litro, metro'],
+      ['                              Por defecto: "unidad"'],
+      [''],
+      ['  Precio de Venta           → Precio al que se venderá'],
+      ['                              Ejemplo: 75000, 125.99'],
+      ['                              Por defecto: Costo * 1.30 (30% de ganancia)'],
+      [''],
+      ['  Descripción               → Información adicional del producto'],
+      ['                              Ejemplo: Laptop para desarrollo de software'],
+      [''],
+      ['═══════════════════════════════════════════════════════════════════════════════════'],
+      ['🔄 PROCESO AUTOMÁTICO AL CARGAR EL ARCHIVO'],
+      [''],
+      ['Para cada fila válida del Excel:'],
+      ['  1. 🔍 Busca el producto por SKU'],
+      ['  2. 🆕 Si no existe y autoCreateProducts=true → lo crea con los campos azules'],
+      ['  3. 📥 Crea una transacción de ENTRADA (INBOUND)'],
+      ['  4. 🏷️  Crea un LOTE (batch) con el costo especificado'],
+      ['  5. 📊 Actualiza el stock del almacén'],
+      ['  6. 📝 Registra auditoría completa'],
+      [''],
+      ['═══════════════════════════════════════════════════════════════════════════════════'],
+      ['❓ PREGUNTAS FRECUENTES'],
+      [''],
+      ['Q: ¿Qué pasa si cargo un producto que ya existe pero con diferente costo?'],
+      ['A: El sistema NO modifica el producto. Crea un nuevo LOTE con el costo que especifiques.'],
+      ['   Cada lote mantiene su costo individual, lo cual es correcto porque cada compra'],
+      ['   puede tener precios diferentes. El sistema calcula el costo promedio automáticamente.'],
+      [''],
+      ['Q: ¿Puedo actualizar el precio de venta de productos existentes?'],
+      ['A: NO. Esta carga es solo para INVENTARIO. Para actualizar productos usa la'],
+      ['   carga masiva de PRODUCTOS (diferente endpoint).'],
+      [''],
+      ['Q: ¿Qué pasa si no especifico almacén?'],
+      ['A: El sistema usa el almacén principal de tu empresa o el especificado en'],
+      ['   el parámetro defaultWarehouseCode del API.'],
+      [''],
+      ['Q: ¿Puedo cargar productos que no existen?'],
+      ['A: SÍ, si usas autoCreateProducts=true (default). Solo asegúrate de completar'],
+      ['   el campo "Nombre Producto" (naranja) en ese caso.'],
+      [''],
+      ['═══════════════════════════════════════════════════════════════════════════════════'],
+      ['⚠️ VALIDACIONES Y RESTRICCIONES'],
+      [''],
+      ['  ✓ SKU debe existir (o se crea si autoCreateProducts=true)'],
+      ['  ✓ Cantidad debe ser mayor a 0'],
+      ['  ✓ Costo Unitario debe ser mayor a 0'],
+      ['  ✓ Almacén debe existir en el sistema (si se especifica)'],
+      ['  ✓ Fechas deben estar en formato YYYY-MM-DD o DD/MM/YYYY'],
+      ['  ✓ Números deben usar punto (.) como separador decimal: 1000.50'],
+      ['  ✓ Máximo 1000 filas por archivo'],
+      [''],
+      ['═══════════════════════════════════════════════════════════════════════════════════'],
+      ['💡 CASOS DE USO COMUNES'],
+      [''],
+      ['Caso 1: Compra de productos existentes'],
+      ['  → Llena solo columnas ROJAS: SKU, Cantidad, Costo'],
+      ['  → Opcionalmente: Referencia/OC, Proveedor'],
+      [''],
+      ['Caso 2: Primera compra de productos nuevos'],
+      ['  → Llena columnas ROJAS: SKU, Cantidad, Costo'],
+      ['  → Llena columna NARANJA: Nombre Producto'],
+      ['  → Llena columnas AZULES: Categoría, Unidad, Precio, Descripción'],
+      [''],
+      ['Caso 3: Productos con vencimiento (medicinas, alimentos)'],
+      ['  → Llena columnas ROJAS + Fecha de Vencimiento + Número de Lote'],
+      [''],
+      ['Caso 4: Inventario con ubicaciones específicas'],
+      ['  → Llena columnas ROJAS + Almacén + Ubicación'],
+      [''],
+      ['═══════════════════════════════════════════════════════════════════════════════════'],
+      ['📊 DIFERENCIA ENTRE CARGA DE INVENTARIO Y CARGA DE PRODUCTOS'],
+      [''],
+      ['  📦 CARGA DE INVENTARIO (este archivo):'],
+      ['     • Propósito: Registrar ENTRADAS de mercancía (compras, recepciones)'],
+      ['     • Crea: Transacciones, lotes, actualiza stock'],
+      ['     • Endpoint: POST /api/v1/inventory/bulk/upload'],
+      [''],
+      ['  📝 CARGA DE PRODUCTOS (diferente archivo):'],
+      ['     • Propósito: Crear/actualizar el CATÁLOGO de productos'],
+      ['     • Crea: Productos, actualiza precios, descripciones'],
+      ['     • Endpoint: POST /api/v1/products/bulk/upload'],
+      [''],
+      ['═══════════════════════════════════════════════════════════════════════════════════'],
+      ['🚀 PASOS RECOMENDADOS'],
+      [''],
+      ['  1. Descarga esta plantilla'],
+      ['  2. Llena los datos (respeta los campos obligatorios en ROJO)'],
+      ['  3. Guarda el archivo Excel'],
+      ['  4. (Opcional) Valida: POST /api/v1/inventory/bulk/validate'],
+      ['  5. (Recomendado) Vista previa: POST /api/v1/inventory/bulk/preview'],
+      ['  6. Carga definitiva: POST /api/v1/inventory/bulk/upload'],
+      [''],
+      ['═══════════════════════════════════════════════════════════════════════════════════'],
+      ['📞 ¿Necesitas ayuda? Contacta al administrador del sistema'],
+    ];
 
     // Instructions sheet
-    const instructionsData = [
-      ['INSTRUCCIONES PARA CARGA MASIVA DE INVENTARIO'],
-      [''],
-      ['IMPORTANTE: Esta plantilla es para REGISTRAR ENTRADAS DE MERCANCÍA (compras/pedidos)'],
-      ['NO es para crear productos. Los productos deben existir previamente en el sistema.'],
-      [''],
-      ['Campos Obligatorios:'],
-      ['  - SKU: Código del producto (debe existir en el sistema)'],
-      ['  - Cantidad: Cantidad que está ingresando al inventario'],
-      ['  - Costo Unitario: Costo de compra unitario'],
-      [''],
-      ['Campos Opcionales:'],
-      ['  - Número de Lote: Identificador del lote de producción'],
-      ['  - Fecha de Vencimiento: Formato YYYY-MM-DD (ej: 2026-12-31) para productos perecederos'],
-      ['  - Almacén: Código del almacén (si no se especifica, usa el almacén principal)'],
-      ['  - Proveedor: Nombre del proveedor'],
-      ['  - Referencia/OC: Número de orden de compra o referencia'],
-      ['  - Ubicación: Ubicación física dentro del almacén (ej: Estante A-1)'],
-      ['  - Notas: Observaciones adicionales'],
-      [''],
-      ['Proceso Automático:'],
-      ['  1. Crea una transacción de entrada (INBOUND) por cada fila'],
-      ['  2. Crea un lote (BATCH) automáticamente con el costo especificado'],
-      ['  3. Actualiza el stock del producto'],
-      ['  4. Registra la trazabilidad completa para futuras ventas'],
-      [''],
-      ['Notas Importantes:'],
-      ['  - Los productos (SKUs) DEBEN existir antes de cargar inventario'],
-      ['  - Si un producto no existe, use primero la carga masiva de productos'],
-      ['  - Cada fila crea un lote independiente (permite diferentes costos)'],
-      ['  - Los números deben usar punto como separador decimal (ej: 1000.50)'],
-      ['  - Las fechas deben estar en formato YYYY-MM-DD'],
-      ['  - El archivo puede tener hasta 1000 filas'],
-      [''],
-      ['Diferencia con Carga de Productos:'],
-      ['  - Carga de Productos: Crea/actualiza el CATÁLOGO de productos (nombre, precio, etc.)'],
-      ['  - Carga de Inventario: Registra ENTRADA de mercancía al almacén (cantidades, lotes)'],
-    ];
+    const instructionsSheet = workbook.addWorksheet('Instrucciones');
+    instructionsSheet.columns = [{ width: 95 }];
 
-    const wsInstructions = XLSX.utils.aoa_to_sheet(instructionsData);
-    wsInstructions['!cols'] = [{ wch: 85 }];
-    XLSX.utils.book_append_sheet(wb, wsInstructions, 'Instrucciones');
+    instructionsData.forEach(row => instructionsSheet.addRow(row));
 
-    return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    // Generate buffer
+    const buffer = await workbook.xlsx.writeBuffer();
+    return Buffer.from(buffer);
   }
 
   /**

@@ -276,6 +276,43 @@ This system uses a **single-table multi-tenancy** approach:
 
 MIT
 
+## Documentation
+
+### 📚 Complete Technical Documentation
+
+This project includes comprehensive technical documentation organized in the `/docs` folder:
+
+- **[DESCRIPCION_PROYECTO.md](DESCRIPCION_PROYECTO.md)** - Executive summary and project overview (Spanish)
+- **[DESIGN.md](DESIGN.md)** - Complete system architecture design (1317 lines)
+- **[docs/README.md](docs/README.md)** - Documentation index and navigation guide
+
+### 📂 Documentation Structure
+
+```
+docs/
+├── README.md                    # Documentation index
+├── features/                    # Specific feature docs
+│   ├── DESCUENTOS_MANUALES.md
+│   ├── METODOS_PAGO.md
+│   └── TRANSACCIONES_INVENTARIO.md
+├── frontend/                    # Frontend integration guides
+│   ├── INTEGRATION_GUIDE.md
+│   ├── CODE_EXAMPLES.md
+│   └── OPTIMIZATION_GUIDE.md
+├── AUDIT_LOG_SYSTEM.md          # Complete audit system
+├── ACTIVITY_LOGS_SYSTEM.md      # Activity logging
+├── BULK_INVENTORY_UPLOAD.md     # Bulk upload feature
+├── SALES_MODULE_DESIGN.md       # Sales module design
+└── WAREHOUSE_IMPROVEMENTS.md    # Warehouse improvements
+```
+
+### 🚀 Quick Links
+
+- [API Documentation (Swagger)](http://localhost:3000/api-docs) - Interactive API docs
+- [Sales Module Design](docs/SALES_MODULE_DESIGN.md) - Complete sales module specification
+- [Frontend Integration](docs/frontend/INTEGRATION_GUIDE.md) - Frontend developer guide
+- [Audit System](docs/AUDIT_LOG_SYSTEM.md) - Audit and logging implementation
+
 ## Support
 
 For questions or issues, please contact the development team.
@@ -283,4 +320,4 @@ For questions or issues, please contact the development team.
 ---
 
 **Version**: 1.0.0
-**Last Updated**: 2025-01-12
+**Last Updated**: 2026-01-11
