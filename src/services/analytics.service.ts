@@ -3,6 +3,7 @@ import { InventoryTransaction, TransactionType, TransactionReason } from '../ent
 import { Product } from '../entities/Product.entity';
 import { Category } from '../entities/Category.entity';
 import { SalesAggregate } from '../entities/SalesAggregate.entity';
+import { Warehouse } from '../entities/Warehouse.entity';
 import { AppDataSource } from '../config/database';
 import {
   TimelineQueryDto,
@@ -15,6 +16,11 @@ import {
   InventoryStatusResponseDto,
   LowStockAlertDto,
   Granularity,
+  WarehouseSalesQueryDto,
+  WarehouseSalesResponseDto,
+  WarehouseSalesDto,
+  TopProductResponseDto,
+  TimelineDataPoint,
 } from '../dto/analytics/analytics.dto';
 
 export class AnalyticsService {
@@ -22,12 +28,85 @@ export class AnalyticsService {
   private productRepo: Repository<Product>;
   private categoryRepo: Repository<Category>;
   private salesAggregateRepo: Repository<SalesAggregate>;
+  private warehouseRepo: Repository<Warehouse>;
 
   constructor() {
     this.transactionRepo = AppDataSource.getRepository(InventoryTransaction);
     this.productRepo = AppDataSource.getRepository(Product);
     this.categoryRepo = AppDataSource.getRepository(Category);
     this.salesAggregateRepo = AppDataSource.getRepository(SalesAggregate);
+    this.warehouseRepo = AppDataSource.getRepository(Warehouse);
+  }
+
+  /**
+   * Calcula el valor total del inventario actual
+   */
+  private async calculateInventoryValue(companyId: number): Promise<number> {
+    // Obtener el valor de la última transacción de cada producto por almacén
+    const result = await this.transactionRepo
+      .createQueryBuilder('txn')
+      .select('SUM(txn.newStock * COALESCE(txn.unitCost, 0))', 'totalValue')
+      .where('txn.companyId = :companyId', { companyId })
+      .andWhere(`txn.id IN (
+        SELECT MAX(id)
+        FROM inventory_transactions
+        WHERE company_id = @0
+        GROUP BY product_id, warehouse_id
+      )`, [companyId])
+      .getRawOne();
+
+    return parseFloat(result?.totalValue || 0);
+  }
+
+  /**
+   * Calcula el cambio porcentual comparando con el período anterior
+   */
+  private async calculatePercentageChange(
+    companyId: number,
+    currentStart: Date,
+    currentEnd: Date
+  ): Promise<number> {
+    // Calcular duración del período actual
+    const durationMs = currentEnd.getTime() - currentStart.getTime();
+
+    // Período anterior con la misma duración
+    const previousEnd = new Date(currentStart.getTime());
+    const previousStart = new Date(currentStart.getTime() - durationMs);
+
+    const [currentSales, previousSales] = await Promise.all([
+      this.getTotalSales(companyId, currentStart, currentEnd),
+      this.getTotalSales(companyId, previousStart, previousEnd),
+    ]);
+
+    if (previousSales === 0) return currentSales > 0 ? 100 : 0;
+
+    return ((currentSales - previousSales) / previousSales) * 100;
+  }
+
+  /**
+   * Cuenta productos totales activos
+   */
+  private async countTotalProducts(companyId: number): Promise<number> {
+    return await this.productRepo.count({
+      where: { companyId, isActive: true },
+    });
+  }
+
+  /**
+   * Calcula margen de ganancia para un producto
+   */
+  private async calculateProfitMargin(productId: number, revenue: number, quantitySold: number): Promise<number | null> {
+    const product = await this.productRepo.findOne({
+      where: { id: productId },
+      select: ['cost', 'price'],
+    });
+
+    if (!product || !product.cost || !product.price) return null;
+
+    const totalCost = product.cost * quantitySold;
+    const profit = revenue - totalCost;
+
+    return totalCost > 0 ? (profit / totalCost) * 100 : null;
   }
 
   /**
@@ -69,8 +148,13 @@ export class AnalyticsService {
     // Alertas de stock bajo
     const lowStockAlerts = await this.getLowStockAlerts(companyId);
 
-    // Calcular porcentaje de cambio (simplificado)
-    const percentageChange = 0; // TODO: implementar comparación con período anterior
+    // Calcular porcentaje de cambio comparando con período anterior
+    const percentageChange = startDate && endDate
+      ? await this.calculatePercentageChange(companyId, startDate, endDate)
+      : 0;
+
+    // Calcular valor total de inventario
+    const inventoryValue = await this.calculateInventoryValue(companyId);
 
     return {
       totalSales: {
@@ -86,7 +170,7 @@ export class AnalyticsService {
       categoriesPerformance: categories.slice(0, 5),
       lowStockAlerts: lowStockAlerts.slice(0, 10),
       recentTransactions: parseInt(salesData?.totalCount || 0),
-      inventoryValue: 0, // TODO: calcular valor de inventario
+      inventoryValue,
     };
   }
 
@@ -196,18 +280,31 @@ export class AnalyticsService {
 
     const results = await queryBuilder.getRawMany();
 
-    return results.map((item, index) => ({
-      rank: index + 1,
-      productId: item.productId,
-      sku: item.sku,
-      name: item.name,
-      categoryName: item.categoryName || null,
-      quantitySold: parseFloat(item.quantitySold || 0),
-      revenue: parseFloat(item.revenue || 0),
-      transactionCount: parseInt(item.transactionCount || 0),
-      avgUnitPrice: parseFloat(item.avgUnitPrice || 0),
-      profitMargin: null, // TODO: calcular margen de ganancia
-    }));
+    // Calcular margen de ganancia para cada producto
+    const productsWithMargin = await Promise.all(
+      results.map(async (item, index) => {
+        const profitMargin = await this.calculateProfitMargin(
+          item.productId,
+          parseFloat(item.revenue || 0),
+          parseFloat(item.quantitySold || 0)
+        );
+
+        return {
+          rank: index + 1,
+          productId: item.productId,
+          sku: item.sku,
+          name: item.name,
+          categoryName: item.categoryName || null,
+          quantitySold: parseFloat(item.quantitySold || 0),
+          revenue: parseFloat(item.revenue || 0),
+          transactionCount: parseInt(item.transactionCount || 0),
+          avgUnitPrice: parseFloat(item.avgUnitPrice || 0),
+          profitMargin,
+        };
+      })
+    );
+
+    return productsWithMargin;
   }
 
   /**
@@ -305,17 +402,147 @@ export class AnalyticsService {
    */
   async getInventoryStatus(companyId: number): Promise<InventoryStatusResponseDto> {
     const lowStockAlerts = await this.getLowStockAlerts(companyId);
+    const totalProducts = await this.countTotalProducts(companyId);
+    const totalValue = await this.calculateInventoryValue(companyId);
+
+    // Detectar productos con overstock (stock > reorderPoint * 2)
+    const overstockCount = await this.countOverstockProducts(companyId);
 
     return {
       summary: {
-        totalProducts: 0, // TODO: contar productos totales
-        totalValue: 0, // TODO: calcular valor total
+        totalProducts,
+        totalValue,
         lowStockCount: lowStockAlerts.filter(a => a.status === 'low').length,
         criticalStockCount: lowStockAlerts.filter(a => a.status === 'critical').length,
-        overstockCount: 0, // TODO: detectar overstock
+        overstockCount,
       },
       products: lowStockAlerts,
     };
+  }
+
+  /**
+   * Reporte de ventas por almacén/sucursal
+   */
+  async getWarehouseSalesReport(
+    companyId: number,
+    query: WarehouseSalesQueryDto
+  ): Promise<WarehouseSalesResponseDto> {
+    const { startDate, endDate, warehouseId, granularity = Granularity.DAY, includeProducts = false } = query;
+
+    // Definir rango de fechas (últimos 30 días si no se especifica)
+    const endDateObj = endDate ? new Date(endDate) : new Date();
+    const startDateObj = startDate ? new Date(startDate) : new Date(endDateObj.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    // Obtener ventas por almacén
+    let queryBuilder = this.transactionRepo
+      .createQueryBuilder('txn')
+      .innerJoin('txn.warehouse', 'warehouse')
+      .select('warehouse.id', 'warehouseId')
+      .addSelect('warehouse.name', 'warehouseName')
+      .addSelect('warehouse.code', 'warehouseCode')
+      .addSelect('SUM(txn.totalCost)', 'totalSales')
+      .addSelect('COUNT(*)', 'totalTransactions')
+      .addSelect('SUM(ABS(txn.quantity))', 'totalQuantitySold')
+      .addSelect('AVG(txn.totalCost)', 'avgTicket')
+      .where('txn.companyId = :companyId', { companyId })
+      .andWhere('txn.type = :type', { type: TransactionType.OUTBOUND })
+      .andWhere('txn.reason = :reason', { reason: TransactionReason.SALE })
+      .andWhere('txn.createdAt BETWEEN :startDate AND :endDate', {
+        startDate: startDateObj,
+        endDate: endDateObj,
+      });
+
+    if (warehouseId) {
+      queryBuilder = queryBuilder.andWhere('warehouse.id = :warehouseId', { warehouseId });
+    }
+
+    queryBuilder = queryBuilder
+      .groupBy('warehouse.id, warehouse.name, warehouse.code')
+      .orderBy('totalSales', 'DESC');
+
+    const warehouseResults = await queryBuilder.getRawMany();
+
+    // Calcular total de ventas para porcentajes
+    const totalSales = warehouseResults.reduce((sum, w) => sum + parseFloat(w.totalSales || 0), 0);
+    const totalTransactions = warehouseResults.reduce((sum, w) => sum + parseInt(w.totalTransactions || 0), 0);
+
+    // Construir respuesta con datos de cada almacén
+    const warehouses: WarehouseSalesDto[] = await Promise.all(
+      warehouseResults.map(async (item) => {
+        const warehouseSales = parseFloat(item.totalSales || 0);
+        const warehouseData: WarehouseSalesDto = {
+          warehouseId: item.warehouseId,
+          warehouseName: item.warehouseName,
+          warehouseCode: item.warehouseCode,
+          totalSales: warehouseSales,
+          totalTransactions: parseInt(item.totalTransactions || 0),
+          totalQuantitySold: parseFloat(item.totalQuantitySold || 0),
+          avgTicket: parseFloat(item.avgTicket || 0),
+          percentageOfTotal: totalSales > 0 ? (warehouseSales / totalSales) * 100 : 0,
+        };
+
+        // Incluir top productos si se solicita
+        if (includeProducts) {
+          const topProducts = await this.getTopProductsByWarehouse(
+            companyId,
+            item.warehouseId,
+            startDateObj,
+            endDateObj,
+            5
+          );
+          warehouseData.topProducts = topProducts;
+        }
+
+        return warehouseData;
+      })
+    );
+
+    return {
+      warehouses,
+      summary: {
+        totalSales,
+        totalTransactions,
+        totalWarehouses: warehouses.length,
+        avgSalesPerWarehouse: warehouses.length > 0 ? totalSales / warehouses.length : 0,
+      },
+      period: {
+        startDate: startDateObj.toISOString(),
+        endDate: endDateObj.toISOString(),
+      },
+    };
+  }
+
+  /**
+   * Obtiene los productos más vendidos de un almacén específico
+   */
+  private async getTopProductsByWarehouse(
+    companyId: number,
+    warehouseId: number,
+    startDate: Date,
+    endDate: Date,
+    limit: number = 5
+  ): Promise<TopProductResponseDto[]> {
+    const results = await this.transactionRepo
+      .createQueryBuilder('txn')
+      .innerJoin('txn.product', 'product')
+      .select('product.id', 'productId')
+      .addSelect('product.name', 'name')
+      .addSelect('SUM(txn.totalCost)', 'revenue')
+      .where('txn.companyId = :companyId', { companyId })
+      .andWhere('txn.warehouseId = :warehouseId', { warehouseId })
+      .andWhere('txn.type = :type', { type: TransactionType.OUTBOUND })
+      .andWhere('txn.reason = :reason', { reason: TransactionReason.SALE })
+      .andWhere('txn.createdAt BETWEEN :startDate AND :endDate', { startDate, endDate })
+      .groupBy('product.id, product.name')
+      .orderBy('revenue', 'DESC')
+      .limit(limit)
+      .getRawMany();
+
+    return results.map(item => ({
+      productId: item.productId,
+      name: item.name,
+      revenue: parseFloat(item.revenue || 0),
+    }));
   }
 
   // Helper methods
@@ -334,8 +561,127 @@ export class AnalyticsService {
   }
 
   private async getLowStockAlerts(companyId: number): Promise<LowStockAlertDto[]> {
-    // TODO: implementar cálculo de stock actual y comparar con minimumStock
-    return [];
+    // Obtener productos activos con su stock actual
+    const productsWithStock = await this.productRepo
+      .createQueryBuilder('product')
+      .leftJoin(
+        (qb) => qb
+          .select('txn.product_id', 'productId')
+          .addSelect('MAX(txn.id)', 'lastTransactionId')
+          .from('inventory_transactions', 'txn')
+          .where('txn.company_id = :companyId', { companyId })
+          .groupBy('txn.product_id'),
+        'last_txn',
+        'last_txn.productId = product.id'
+      )
+      .leftJoin(
+        'inventory_transactions',
+        'txn',
+        'txn.id = last_txn.lastTransactionId'
+      )
+      .select('product.id', 'productId')
+      .addSelect('product.name', 'name')
+      .addSelect('product.minimum_stock', 'minimumStock')
+      .addSelect('product.reorder_point', 'reorderPoint')
+      .addSelect('COALESCE(txn.new_stock, 0)', 'currentStock')
+      .where('product.company_id = :companyId', { companyId })
+      .andWhere('product.is_active = 1')
+      .getRawMany();
+
+    const alerts: LowStockAlertDto[] = [];
+
+    for (const item of productsWithStock) {
+      const currentStock = parseFloat(item.currentStock || 0);
+      const minimumStock = parseFloat(item.minimumStock || 0);
+      const reorderPoint = parseFloat(item.reorderPoint || 0);
+
+      // Solo incluir si está por debajo del reorder point
+      if (currentStock <= reorderPoint) {
+        const status: 'low' | 'critical' = currentStock <= minimumStock ? 'critical' : 'low';
+
+        // Calcular días hasta agotamiento basado en promedio de ventas
+        const avgDailySales = await this.getAverageDailySales(companyId, item.productId);
+        const daysUntilStockout = avgDailySales > 0
+          ? Math.floor(currentStock / avgDailySales)
+          : null;
+
+        // Cantidad recomendada de reorden
+        const recommendedOrderQuantity = Math.max(
+          reorderPoint * 2 - currentStock,
+          minimumStock - currentStock
+        );
+
+        alerts.push({
+          productId: item.productId,
+          name: item.name,
+          currentStock,
+          minimumStock,
+          reorderPoint,
+          status,
+          daysUntilStockout,
+          recommendedOrderQuantity: Math.ceil(recommendedOrderQuantity),
+        });
+      }
+    }
+
+    // Ordenar por criticidad (críticos primero) y luego por stock
+    return alerts.sort((a, b) => {
+      if (a.status === 'critical' && b.status !== 'critical') return -1;
+      if (a.status !== 'critical' && b.status === 'critical') return 1;
+      return a.currentStock - b.currentStock;
+    });
+  }
+
+  /**
+   * Calcula promedio de ventas diarias de un producto
+   */
+  private async getAverageDailySales(companyId: number, productId: number): Promise<number> {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const result = await this.transactionRepo
+      .createQueryBuilder('txn')
+      .select('SUM(ABS(txn.quantity))', 'totalSold')
+      .where('txn.companyId = :companyId', { companyId })
+      .andWhere('txn.productId = :productId', { productId })
+      .andWhere('txn.type = :type', { type: TransactionType.OUTBOUND })
+      .andWhere('txn.reason = :reason', { reason: TransactionReason.SALE })
+      .andWhere('txn.createdAt >= :startDate', { startDate: thirtyDaysAgo })
+      .getRawOne();
+
+    const totalSold = parseFloat(result?.totalSold || 0);
+    return totalSold / 30; // Promedio diario
+  }
+
+  /**
+   * Cuenta productos con overstock
+   */
+  private async countOverstockProducts(companyId: number): Promise<number> {
+    const productsWithStock = await this.productRepo
+      .createQueryBuilder('product')
+      .leftJoin(
+        (qb) => qb
+          .select('txn.product_id', 'productId')
+          .addSelect('MAX(txn.id)', 'lastTransactionId')
+          .from('inventory_transactions', 'txn')
+          .where('txn.company_id = :companyId', { companyId })
+          .groupBy('txn.product_id'),
+        'last_txn',
+        'last_txn.productId = product.id'
+      )
+      .leftJoin(
+        'inventory_transactions',
+        'txn',
+        'txn.id = last_txn.lastTransactionId'
+      )
+      .select('COUNT(*)', 'count')
+      .where('product.company_id = :companyId', { companyId })
+      .andWhere('product.is_active = 1')
+      .andWhere('product.reorder_point > 0')
+      .andWhere('COALESCE(txn.new_stock, 0) > product.reorder_point * 2')
+      .getRawOne();
+
+    return parseInt(productsWithStock?.count || 0);
   }
 
   private getDateGroupExpression(granularity: Granularity): string {

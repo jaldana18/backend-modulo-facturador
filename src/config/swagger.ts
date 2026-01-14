@@ -33,7 +33,18 @@ const swaggerOptions: swaggerJsDoc.Options = {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
-          description: 'Enter your JWT token in the format: Bearer <token>',
+          description: `Enter your JWT token in the format: Bearer <token>
+          
+Token includes:
+- userId: User ID
+- companyId: Company ID  
+- email: User email
+- role: User role (admin, manager, user)
+- warehouseId: Warehouse ID (only for 'user' role, null for admin/manager)
+
+Role-based warehouse access:
+- admin/manager: Full access to all warehouses
+- user: Restricted to assigned warehouse only`,
         },
       },
       schemas: {
@@ -150,6 +161,34 @@ const swaggerOptions: swaggerJsDoc.Options = {
             },
           },
         },
+        ResetPasswordRequest: {
+          type: 'object',
+          required: ['email', 'newPassword'],
+          properties: {
+            email: {
+              type: 'string',
+              format: 'email',
+              description: 'User email address',
+              example: 'user@example.com',
+            },
+            newPassword: {
+              type: 'string',
+              minLength: 6,
+              description: 'New password (minimum 6 characters)',
+              example: 'NewPassword123',
+            },
+          },
+        },
+        ResetPasswordResponse: {
+          type: 'object',
+          properties: {
+            message: {
+              type: 'string',
+              description: 'Success message',
+              example: 'Password reset successfully',
+            },
+          },
+        },
         User: {
           type: 'object',
           properties: {
@@ -239,6 +278,12 @@ const swaggerOptions: swaggerJsDoc.Options = {
               type: 'boolean',
               description: 'Whether product is active',
             },
+            imageUrl: {
+              type: 'string',
+              nullable: true,
+              description: 'URL or relative path to product image',
+              example: '/uploads/products/company-1/550e8400-e29b-41d4-a716-446655440000.jpg'
+            },
             metadata: {
               type: 'object',
               nullable: true,
@@ -308,6 +353,24 @@ const swaggerOptions: swaggerJsDoc.Options = {
               description: 'Unit of measure',
               example: 'piece',
             },
+            imageUrl: {
+              type: 'string',
+              nullable: true,
+              maxLength: 500,
+              description: 'URL or relative path to product image',
+              example: '/uploads/products/company-1/550e8400-e29b-41d4-a716-446655440000.jpg'
+            },
+            initialStock: {
+              type: 'number',
+              minimum: 0,
+              description: 'Initial stock quantity (optional). If provided, an ADJUSTMENT transaction will be created.',
+              example: 100,
+            },
+            warehouseId: {
+              type: 'number',
+              description: 'Warehouse ID for initial stock (optional). If not provided, the default warehouse will be used.',
+              example: 1,
+            },
             metadata: {
               type: 'object',
               description: 'Additional metadata',
@@ -361,11 +424,43 @@ const swaggerOptions: swaggerJsDoc.Options = {
               type: 'boolean',
               description: 'Whether product is active',
             },
+            imageUrl: {
+              type: 'string',
+              nullable: true,
+              maxLength: 500,
+              description: 'URL or relative path to product image',
+              example: '/uploads/products/company-1/550e8400-e29b-41d4-a716-446655440000.jpg'
+            },
             metadata: {
               type: 'object',
               description: 'Additional metadata',
             },
           },
+        },
+        ProductImageUploadResponse: {
+          type: 'object',
+          properties: {
+            imageUrl: {
+              type: 'string',
+              description: 'Relative URL to the uploaded image',
+              example: '/uploads/products/company-1/550e8400-e29b-41d4-a716-446655440000.jpg'
+            },
+            filename: {
+              type: 'string',
+              description: 'Generated filename with UUID',
+              example: '550e8400-e29b-41d4-a716-446655440000.jpg'
+            },
+            size: {
+              type: 'integer',
+              description: 'File size in bytes',
+              example: 245680
+            },
+            mimetype: {
+              type: 'string',
+              description: 'File MIME type',
+              example: 'image/jpeg'
+            }
+          }
         },
         // Warehouse schemas
         Warehouse: {
@@ -714,7 +809,7 @@ const swaggerOptions: swaggerJsDoc.Options = {
             },
             warehouseId: {
               type: 'integer',
-              description: 'Warehouse ID (optional, uses main warehouse if not specified)',
+              description: 'Warehouse ID (optional, uses main warehouse if not specified). ALWAYS saved in database.',
               example: 1,
             },
             type: {
@@ -858,6 +953,73 @@ const swaggerOptions: swaggerJsDoc.Options = {
             },
           },
         },
+        BulkTransactionRequest: {
+          type: 'object',
+          required: ['warehouseId', 'items', 'reason'],
+          properties: {
+            warehouseId: {
+              type: 'integer',
+              description: 'Warehouse ID (REQUIRED for bulk operations)',
+              example: 2,
+            },
+            items: {
+              type: 'array',
+              description: 'Array of transaction items',
+              items: {
+                type: 'object',
+                required: ['productId', 'quantity'],
+                properties: {
+                  productId: {
+                    type: 'integer',
+                    description: 'Product ID',
+                    example: 1,
+                  },
+                  quantity: {
+                    type: 'number',
+                    minimum: 0.0001,
+                    description: 'Quantity',
+                    example: 100,
+                  },
+                  unitCost: {
+                    type: 'number',
+                    minimum: 0,
+                    description: 'Unit cost (for inbound)',
+                    example: 15.50,
+                  },
+                  reference: {
+                    type: 'string',
+                    maxLength: 100,
+                    description: 'Reference number',
+                    example: 'FAC-001',
+                  },
+                },
+              },
+            },
+            reason: {
+              type: 'string',
+              enum: [
+                'purchase',
+                'sale',
+                'return',
+                'damaged',
+                'lost',
+                'found',
+                'correction',
+                'initial_stock',
+                'transfer_in',
+                'transfer_out',
+                'other',
+              ],
+              description: 'Transaction reason',
+              example: 'purchase',
+            },
+            notes: {
+              type: 'string',
+              maxLength: 500,
+              description: 'Additional notes',
+            },
+          },
+        },
         StockSummary: {
           type: 'object',
           properties: {
@@ -886,6 +1048,205 @@ const swaggerOptions: swaggerJsDoc.Options = {
               format: 'date-time',
               nullable: true,
               description: 'Last transaction date',
+            },
+          },
+        },
+        WarehouseSummary: {
+          type: 'object',
+          properties: {
+            warehouse: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'integer',
+                  description: 'Warehouse ID',
+                },
+                code: {
+                  type: 'string',
+                  description: 'Warehouse code',
+                },
+                name: {
+                  type: 'string',
+                  description: 'Warehouse name',
+                },
+                isMain: {
+                  type: 'boolean',
+                  description: 'Is main warehouse',
+                },
+                address: {
+                  type: 'string',
+                  description: 'Full address',
+                },
+                managerName: {
+                  type: 'string',
+                  nullable: true,
+                  description: 'Manager name',
+                },
+              },
+            },
+            stats: {
+              type: 'object',
+              properties: {
+                currentStock: {
+                  type: 'number',
+                  description: 'Total current stock',
+                },
+                totalInbound: {
+                  type: 'number',
+                  description: 'Total inbound quantity',
+                },
+                totalOutbound: {
+                  type: 'number',
+                  description: 'Total outbound quantity',
+                },
+                totalAdjustments: {
+                  type: 'number',
+                  description: 'Total adjustments',
+                },
+                uniqueProducts: {
+                  type: 'integer',
+                  description: 'Number of unique products',
+                },
+                transactionCount: {
+                  type: 'integer',
+                  description: 'Total number of transactions',
+                },
+              },
+            },
+            lastActivity: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                date: {
+                  type: 'string',
+                  format: 'date-time',
+                  description: 'Last activity date',
+                },
+                type: {
+                  type: 'string',
+                  description: 'Transaction type',
+                },
+                reason: {
+                  type: 'string',
+                  description: 'Transaction reason',
+                },
+              },
+            },
+          },
+        },
+        WarehouseDetailedSummary: {
+          type: 'object',
+          properties: {
+            warehouse: {
+              type: 'object',
+              properties: {
+                id: {
+                  type: 'integer',
+                },
+                code: {
+                  type: 'string',
+                },
+                name: {
+                  type: 'string',
+                },
+                isMain: {
+                  type: 'boolean',
+                },
+                address: {
+                  type: 'string',
+                },
+                managerName: {
+                  type: 'string',
+                  nullable: true,
+                },
+                phone: {
+                  type: 'string',
+                  nullable: true,
+                },
+                email: {
+                  type: 'string',
+                  nullable: true,
+                },
+              },
+            },
+            stats: {
+              type: 'object',
+              properties: {
+                currentStock: {
+                  type: 'number',
+                },
+                totalInbound: {
+                  type: 'number',
+                },
+                totalOutbound: {
+                  type: 'number',
+                },
+                totalAdjustments: {
+                  type: 'number',
+                },
+                uniqueProducts: {
+                  type: 'integer',
+                },
+                transactionCount: {
+                  type: 'integer',
+                },
+              },
+            },
+            products: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  productId: {
+                    type: 'integer',
+                  },
+                  productName: {
+                    type: 'string',
+                  },
+                  productSku: {
+                    type: 'string',
+                    nullable: true,
+                  },
+                  currentStock: {
+                    type: 'number',
+                  },
+                  lastUpdated: {
+                    type: 'string',
+                    format: 'date-time',
+                  },
+                },
+              },
+            },
+            recentTransactions: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: {
+                    type: 'integer',
+                  },
+                  type: {
+                    type: 'string',
+                  },
+                  reason: {
+                    type: 'string',
+                  },
+                  quantity: {
+                    type: 'number',
+                  },
+                  productName: {
+                    type: 'string',
+                  },
+                  reference: {
+                    type: 'string',
+                    nullable: true,
+                  },
+                  createdAt: {
+                    type: 'string',
+                    format: 'date-time',
+                  },
+                },
+              },
             },
           },
         },
@@ -1125,6 +1486,96 @@ const swaggerOptions: swaggerJsDoc.Options = {
             },
           },
         },
+        // Audit Log schemas
+        AuditLog: {
+          type: 'object',
+          properties: {
+            id: {
+              type: 'integer',
+              description: 'Audit log ID',
+            },
+            companyId: {
+              type: 'integer',
+              description: 'Company ID',
+            },
+            userId: {
+              type: 'integer',
+              nullable: true,
+              description: 'User ID who performed the action',
+            },
+            user: {
+              type: 'object',
+              description: 'User who performed the action',
+              properties: {
+                id: { type: 'integer' },
+                email: { type: 'string' },
+                firstName: { type: 'string' },
+                lastName: { type: 'string' },
+              },
+            },
+            action: {
+              type: 'string',
+              description: 'Action type (CREATE, UPDATE, DELETE, ACTIVATE, etc.)',
+              example: 'CREATE',
+            },
+            entityType: {
+              type: 'string',
+              description: 'Entity type (Product, User, Customer, etc.)',
+              example: 'Product',
+            },
+            entityId: {
+              type: 'integer',
+              nullable: true,
+              description: 'ID of the affected entity',
+            },
+            description: {
+              type: 'string',
+              description: 'Human-readable description of the action',
+              example: 'Usuario creó producto \'Laptop Dell XPS 15\' (SKU: PROD-001)',
+            },
+            ipAddress: {
+              type: 'string',
+              nullable: true,
+              description: 'IP address of the user',
+            },
+            userAgent: {
+              type: 'string',
+              nullable: true,
+              description: 'User agent string',
+            },
+            oldValues: {
+              type: 'string',
+              nullable: true,
+              description: 'Previous values before change (JSON string)',
+            },
+            newValues: {
+              type: 'string',
+              nullable: true,
+              description: 'New values after change (JSON string)',
+            },
+            metadata: {
+              type: 'string',
+              nullable: true,
+              description: 'Additional metadata (JSON string)',
+            },
+            severity: {
+              type: 'string',
+              enum: ['info', 'warning', 'critical'],
+              description: 'Severity level of the action',
+            },
+            module: {
+              type: 'string',
+              nullable: true,
+              description: 'Module where action occurred',
+              example: 'inventory',
+            },
+            createdAt: {
+              type: 'string',
+              format: 'date-time',
+              description: 'Timestamp when action was performed',
+            },
+          },
+        },
       },
     },
     security: [
@@ -1147,11 +1598,15 @@ const swaggerOptions: swaggerJsDoc.Options = {
       },
       {
         name: 'Warehouses',
-        description: 'Warehouse management endpoints',
+        description: 'Warehouse configuration and CRUD endpoints',
       },
       {
         name: 'Inventory',
-        description: 'Inventory transaction and stock management endpoints',
+        description: 'Inventory transaction and stock management endpoints. Note: Users with role "user" are restricted to their assigned warehouse.',
+      },
+      {
+        name: 'Warehouse Management',
+        description: 'Warehouse inventory administration - summary reports and multi-warehouse operations for dashboard and reporting',
       },
       {
         name: 'Bulk Inventory',
@@ -1168,6 +1623,10 @@ const swaggerOptions: swaggerJsDoc.Options = {
       {
         name: 'Categories',
         description: 'Product category management endpoints',
+      },
+      {
+        name: 'Audit Logs Database',
+        description: 'Database-backed audit log endpoints for tracking all user actions with optimized queries and filtering',
       },
     ],
   },

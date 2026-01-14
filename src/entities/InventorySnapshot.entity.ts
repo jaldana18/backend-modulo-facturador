@@ -18,21 +18,21 @@ export class InventorySnapshot {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: 'company_id' })
+  @Column({ name: 'company_id', type: 'int' })
   companyId: number;
 
   @ManyToOne(() => Company)
   @JoinColumn({ name: 'company_id' })
   company: Company;
 
-  @Column({ name: 'product_id' })
+  @Column({ name: 'product_id', type: 'int' })
   productId: number;
 
   @ManyToOne(() => Product)
   @JoinColumn({ name: 'product_id' })
   product: Product;
 
-  @Column({ name: 'warehouse_id', nullable: true })
+  @Column({ name: 'warehouse_id', type: 'int', nullable: true })
   warehouseId: number | null;
 
   @ManyToOne(() => Warehouse, { nullable: true })

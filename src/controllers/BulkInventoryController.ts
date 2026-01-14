@@ -102,7 +102,7 @@ export class BulkInventoryController {
    */
   downloadTemplate = async (req: Request, res: Response): Promise<void> => {
     try {
-      const buffer = this.bulkInventoryService.generateTemplate();
+      const buffer = await this.bulkInventoryService.generateTemplate();
       const filename = 'plantilla-inventario.xlsx';
 
       res.setHeader(

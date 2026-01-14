@@ -102,12 +102,15 @@ export class CategoryRepository extends Repository<Category> {
 
   /**
    * Find all active categories for a company
+   * Includes global categories (companyId = NULL) and company-specific categories
    */
   async findActiveCategories(companyId: number): Promise<Category[]> {
-    return this.find({
-      where: { companyId, isActive: true },
-      order: { sortOrder: 'ASC', name: 'ASC' },
-    });
+    return this.createQueryBuilder('category')
+      .where('category.isActive = :isActive', { isActive: true })
+      .andWhere('(category.company_id IS NULL OR category.company_id = :companyId)', { companyId })
+      .orderBy('category.sortOrder', 'ASC')
+      .addOrderBy('category.name', 'ASC')
+      .getMany();
   }
 
   /**
@@ -142,14 +145,17 @@ export class CategoryRepository extends Repository<Category> {
 
   /**
    * Get hierarchical categories (parent-child structure)
+   * Includes global categories (companyId = NULL) and company-specific categories
    */
   async findHierarchical(companyId: number): Promise<Category[]> {
-    // Get all active categories
-    const categories = await this.find({
-      where: { companyId, isActive: true },
-      relations: ['parent'],
-      order: { sortOrder: 'ASC', name: 'ASC' },
-    });
+    // Get all active categories (global + company-specific)
+    const categories = await this.createQueryBuilder('category')
+      .leftJoinAndSelect('category.parent', 'parent')
+      .where('category.isActive = :isActive', { isActive: true })
+      .andWhere('(category.company_id IS NULL OR category.company_id = :companyId)', { companyId })
+      .orderBy('category.sortOrder', 'ASC')
+      .addOrderBy('category.name', 'ASC')
+      .getMany();
 
     // Build hierarchical structure (only root categories with children loaded)
     const rootCategories = categories.filter((cat) => !cat.parentId);

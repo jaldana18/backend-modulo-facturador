@@ -131,7 +131,7 @@ export class InventoryBatch {
   @Column({ name: 'lot_number', type: 'nvarchar', length: 100, nullable: true })
   lotNumber: string | null;
 
-  @Column({ type: 'nvarchar', length: 'max', nullable: true })
+  @Column({ name: 'serial_numbers', type: 'nvarchar', length: 'max', nullable: true })
   serialNumbers: string | null; // JSON array
 
   // === STATUS ===

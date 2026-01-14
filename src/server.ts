@@ -10,7 +10,6 @@ import { createApp } from './app';
 const startServer = async () => {
   try {
     // Initialize database connection
-    logger.info('🔌 Connecting to database...');
     await initializeDatabase({
       validateSchema: config.validation.schemaOnStartup,
       strictValidation: config.validation.strictSchema,
@@ -21,9 +20,8 @@ const startServer = async () => {
 
     // Start listening
     const server = app.listen(config.port, () => {
-      logger.info(`🚀 Server running on port ${config.port}`);
-      logger.info(`📝 Environment: ${config.nodeEnv}`);
-      logger.info(`🔗 API: http://localhost:${config.port}${config.api.prefix}/${config.api.version}`);
+      console.log(`\n🚀 Server ready on port ${config.port} [${config.nodeEnv}]`);
+      console.log(`📖 API Docs: http://localhost:${config.port}/api-docs\n`);
     });
 
     // Graceful shutdown

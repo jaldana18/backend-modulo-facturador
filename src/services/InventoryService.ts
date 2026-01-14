@@ -5,6 +5,7 @@ import { InventoryTransaction, TransactionType, TransactionReason } from '../ent
 import { ApiError } from '../middleware/errorHandler.middleware';
 import { loggers } from '../config/logger';
 import { AppDataSource } from '../config/database';
+import { ActivityType } from '../entities/ActivityLog.entity';
 
 export interface CreateTransactionDto {
   productId: number;
@@ -173,6 +174,43 @@ export class InventoryService {
       quantity: adjustedQuantity,
       previousStock: currentStock,
       newStock,
+    });
+
+    // Log user activity for inbound/outbound/adjustment
+    // Product already fetched at line 73, reuse it
+    const warehouse = await this.warehouseRepository.findOne({ where: { id: warehouseId } });
+    
+    let activityType: ActivityType;
+    let actionText: string;
+    
+    if (dto.type === TransactionType.INBOUND) {
+      activityType = ActivityType.INVENTORY_RECEIVE;
+      actionText = 'Recibió';
+    } else if (dto.type === TransactionType.OUTBOUND) {
+      activityType = ActivityType.INVENTORY_RECEIVE;
+      actionText = 'Retiró';
+    } else {
+      activityType = ActivityType.INVENTORY_ADJUSTMENT;
+      actionText = 'Ajustó';
+    }
+
+    await loggers.logActivity({
+      companyId,
+      userId,
+      activityType,
+      description: `${actionText} ${Math.abs(adjustedQuantity)} unidades de ${product?.name || 'producto'} en ${warehouse?.name || 'bodega'}`,
+      entityType: 'product',
+      entityId: dto.productId,
+      entityName: product?.name || '',
+      metadata: {
+        warehouseId,
+        warehouseName: warehouse?.name,
+        type: dto.type,
+        reason: dto.reason,
+        quantity: adjustedQuantity,
+        previousStock: currentStock,
+        newStock,
+      },
     });
 
     return transaction;
@@ -396,6 +434,7 @@ export class InventoryService {
       unitCost?: number;
       reference?: string;
     }>,
+    warehouseId: number,
     reason: TransactionReason,
     notes?: string
   ): Promise<InventoryTransaction[]> {
@@ -406,6 +445,7 @@ export class InventoryService {
       for (const item of items) {
         const transaction = await this.createTransaction(companyId, userId, {
           productId: item.productId,
+          warehouseId,
           type: TransactionType.INBOUND,
           reason,
           quantity: item.quantity,
@@ -419,6 +459,7 @@ export class InventoryService {
 
     loggers.logOperation('bulk_inbound_created', userId, companyId, {
       itemCount: items.length,
+      warehouseId,
       reason,
     });
 
@@ -436,6 +477,7 @@ export class InventoryService {
       quantity: number;
       reference?: string;
     }>,
+    warehouseId: number,
     reason: TransactionReason,
     notes?: string
   ): Promise<InventoryTransaction[]> {
@@ -446,6 +488,7 @@ export class InventoryService {
       for (const item of items) {
         const transaction = await this.createTransaction(companyId, userId, {
           productId: item.productId,
+          warehouseId,
           type: TransactionType.OUTBOUND,
           reason,
           quantity: item.quantity,
@@ -458,6 +501,7 @@ export class InventoryService {
 
     loggers.logOperation('bulk_outbound_created', userId, companyId, {
       itemCount: items.length,
+      warehouseId,
       reason,
     });
 
@@ -569,6 +613,160 @@ export class InventoryService {
     summary.lastTransaction = lastTransaction.createdAt;
 
     return summary;
+  }
+
+  /**
+   * Get inventory summary for all warehouses
+   * Returns stock status for each warehouse with totals
+   */
+  async getWarehousesSummary(companyId: number): Promise<any[]> {
+    // Get all active warehouses for the company
+    const warehouses = await this.warehouseRepository.find({
+      where: { companyId, isActive: true },
+      order: { isMain: 'DESC', name: 'ASC' },
+    });
+
+    const summaries = [];
+
+    for (const warehouse of warehouses) {
+      // Get all transactions for this warehouse
+      const transactions = await this.inventoryRepository.find({
+        where: { companyId, warehouseId: warehouse.id },
+      });
+
+      // Calculate totals
+      let totalInbound = 0;
+      let totalOutbound = 0;
+      let totalAdjustments = 0;
+      let currentStock = 0;
+
+      transactions.forEach((transaction) => {
+        if (transaction.type === TransactionType.INBOUND) {
+          totalInbound += Math.abs(transaction.quantity);
+        } else if (transaction.type === TransactionType.OUTBOUND || transaction.type === TransactionType.TRANSFER) {
+          totalOutbound += Math.abs(transaction.quantity);
+        } else if (transaction.type === TransactionType.ADJUSTMENT) {
+          totalAdjustments += transaction.quantity;
+        }
+        currentStock = transaction.newStock;
+      });
+
+      // Count unique products in this warehouse
+      const uniqueProducts = new Set(transactions.map(t => t.productId)).size;
+
+      // Get last transaction
+      const lastTransaction = transactions.length > 0 
+        ? transactions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0]
+        : null;
+
+      summaries.push({
+        warehouse: {
+          id: warehouse.id,
+          code: warehouse.code,
+          name: warehouse.name,
+          isMain: warehouse.isMain,
+          address: warehouse.getFullAddress(),
+          managerName: warehouse.managerName,
+        },
+        stats: {
+          currentStock,
+          totalInbound,
+          totalOutbound,
+          totalAdjustments,
+          uniqueProducts,
+          transactionCount: transactions.length,
+        },
+        lastActivity: lastTransaction ? {
+          date: lastTransaction.createdAt,
+          type: lastTransaction.type,
+          reason: lastTransaction.reason,
+        } : null,
+      });
+    }
+
+    return summaries;
+  }
+
+  /**
+   * Get inventory summary for a specific warehouse
+   */
+  async getWarehouseSummary(companyId: number, warehouseId: number): Promise<any> {
+    // Validate warehouse exists
+    const warehouse = await this.warehouseRepository.findOne({
+      where: { id: warehouseId, companyId, isActive: true },
+    });
+
+    if (!warehouse) {
+      throw new ApiError(404, 'WAREHOUSE_NOT_FOUND', 'Warehouse not found');
+    }
+
+    // Get all transactions for this warehouse
+    const transactions = await this.inventoryRepository.find({
+      where: { companyId, warehouseId },
+      relations: ['product'],
+      order: { createdAt: 'DESC' },
+    });
+
+    // Calculate totals
+    let totalInbound = 0;
+    let totalOutbound = 0;
+    let totalAdjustments = 0;
+    const productStocks = new Map<number, any>();
+
+    transactions.forEach((transaction) => {
+      if (transaction.type === TransactionType.INBOUND) {
+        totalInbound += Math.abs(transaction.quantity);
+      } else if (transaction.type === TransactionType.OUTBOUND || transaction.type === TransactionType.TRANSFER) {
+        totalOutbound += Math.abs(transaction.quantity);
+      } else if (transaction.type === TransactionType.ADJUSTMENT) {
+        totalAdjustments += transaction.quantity;
+      }
+
+      // Track per-product stock
+      if (!productStocks.has(transaction.productId)) {
+        productStocks.set(transaction.productId, {
+          productId: transaction.productId,
+          productName: transaction.product?.name || 'Unknown',
+          productSku: transaction.product?.sku || null,
+          currentStock: transaction.newStock,
+          lastUpdated: transaction.createdAt,
+        });
+      }
+    });
+
+    const productsList = Array.from(productStocks.values());
+    const currentStock = productsList.reduce((sum, p) => sum + p.currentStock, 0);
+
+    return {
+      warehouse: {
+        id: warehouse.id,
+        code: warehouse.code,
+        name: warehouse.name,
+        isMain: warehouse.isMain,
+        address: warehouse.getFullAddress(),
+        managerName: warehouse.managerName,
+        phone: warehouse.phone,
+        email: warehouse.email,
+      },
+      stats: {
+        currentStock,
+        totalInbound,
+        totalOutbound,
+        totalAdjustments,
+        uniqueProducts: productStocks.size,
+        transactionCount: transactions.length,
+      },
+      products: productsList,
+      recentTransactions: transactions.slice(0, 10).map(t => ({
+        id: t.id,
+        type: t.type,
+        reason: t.reason,
+        quantity: t.quantity,
+        productName: t.product?.name || 'Unknown',
+        reference: t.reference,
+        createdAt: t.createdAt,
+      })),
+    };
   }
 
   /**

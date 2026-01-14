@@ -1,13 +1,16 @@
 import { Request, Response } from 'express';
 import { ProductService } from '../services/ProductService';
+import { ImageUploadService } from '../services/ImageUploadService';
 import { CreateProductDto } from '../dto/product/create-product.dto';
 import { UpdateProductDto } from '../dto/product/update-product.dto';
 import { QueryProductsDto } from '../dto/product/query-products.dto';
 import { validateDto } from '../utils/validators.util';
 import { ApiResponse } from '../common.types';
+import { ApiError } from '../middleware/errorHandler.middleware';
 
 export class ProductController {
   private productService = new ProductService();
+  private imageUploadService = new ImageUploadService();
 
   /**
    * GET /api/v1/products
@@ -160,6 +163,81 @@ export class ProductController {
     const response: ApiResponse = {
       success: true,
       data: statistics,
+    };
+
+    res.json(response);
+  };
+
+  /**
+   * POST /api/v1/products/:id/image
+   * Upload or replace product image
+   */
+  uploadProductImage = async (req: Request, res: Response): Promise<void> => {
+    const companyId = req.user!.companyId;
+    const productId = parseInt(req.params.id);
+
+    // Check if file was uploaded
+    if (!req.file) {
+      throw new ApiError(400, 'NO_FILE_UPLOADED', 'No se subió ninguna imagen');
+    }
+
+    // Get the product to check if it exists and get current image
+    const product = await this.productService.getProductById(companyId, productId);
+
+    // Upload or replace image
+    const uploadResult = await this.imageUploadService.replaceProductImage(
+      req.file,
+      companyId,
+      productId,
+      product.imageUrl
+    );
+
+    // Update product with new image URL
+    await this.productService.updateProduct(companyId, req.user!.userId, productId, {
+      imageUrl: uploadResult.url,
+    });
+
+    const response: ApiResponse = {
+      success: true,
+      data: {
+        imageUrl: uploadResult.url,
+        filename: uploadResult.filename,
+        size: uploadResult.size,
+        mimetype: uploadResult.mimetype,
+      },
+    };
+
+    res.json(response);
+  };
+
+  /**
+   * DELETE /api/v1/products/:id/image
+   * Delete product image
+   */
+  deleteProductImage = async (req: Request, res: Response): Promise<void> => {
+    const companyId = req.user!.companyId;
+    const productId = parseInt(req.params.id);
+
+    // Get the product
+    const product = await this.productService.getProductById(companyId, productId);
+
+    if (!product.imageUrl) {
+      throw new ApiError(404, 'NO_IMAGE_FOUND', 'El producto no tiene imagen');
+    }
+
+    // Delete the image file
+    await this.imageUploadService.deleteProductImage(product.imageUrl);
+
+    // Update product to remove image URL
+    await this.productService.updateProduct(companyId, req.user!.userId, productId, {
+      imageUrl: null,
+    });
+
+    const response: ApiResponse = {
+      success: true,
+      data: {
+        message: 'Imagen eliminada correctamente',
+      },
     };
 
     res.json(response);

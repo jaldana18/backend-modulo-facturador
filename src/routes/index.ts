@@ -10,6 +10,14 @@ import analyticsRoutes from './analytics.routes';
 import batchRoutes from './batch.routes';
 import bulkProductRoutes from './bulk-product.routes';
 import bulkInventoryRoutes from './bulk-inventory.routes';
+import customerRoutes from './customer.routes';
+import paymentMethodRoutes from './payment-method.routes';
+import saleRoutes from './sale.routes';
+import paymentRoutes from './payment.routes';
+import auditLogRoutes from './audit-log.routes';
+import auditLogDbRoutes from './audit-log-db.routes';
+import activityLogRoutes from './activity-log.routes';
+import unitOfMeasureRoutes from './unit-of-measure.routes';
 
 const router = Router();
 
@@ -27,5 +35,13 @@ router.use('/users', userRoutes);
 router.use('/categories', categoryRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/batches', batchRoutes);
+router.use('/customers', customerRoutes);
+router.use('/payment-methods', paymentMethodRoutes);
+router.use('/sales', saleRoutes);
+router.use('/payments', paymentRoutes);
+router.use('/audit-logs', auditLogRoutes); // Legacy file-based audit logs
+router.use('/audit-logs-db', auditLogDbRoutes); // New database audit logs
+router.use('/activity-logs', activityLogRoutes);
+router.use('/units-of-measure', unitOfMeasureRoutes);
 
 export default router;

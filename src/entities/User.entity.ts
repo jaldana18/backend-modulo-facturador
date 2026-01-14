@@ -44,6 +44,9 @@ export class User {
   @Column({ length: 50 })
   role: UserRole;
 
+  @Column({ name: 'warehouse_id', type: 'int', nullable: true })
+  warehouseId: number | null;
+
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 

@@ -71,10 +71,7 @@ export class AutoMigrationManager {
       const status = await this.checkPendingMigrations();
 
       if (!status.hasPendingMigrations) {
-        logger.info('✅ No pending migrations to run', {
-          type: 'migration_status',
-          totalExecuted: status.executedMigrations.length,
-        });
+        // Silent success - no pending migrations
         return {
           success: true,
           executed: [],
@@ -105,17 +102,7 @@ export class AutoMigrationManager {
       }
 
       // Development or forced execution
-      logger.info(`🔄 Running ${status.totalPending} pending migrations...`, {
-        type: 'migration_start',
-        environment: config.nodeEnv,
-        pendingMigrations: status.pendingMigrations,
-        forced: force,
-      });
-
-      console.log(
-        `\n🔄 Running ${status.totalPending} pending migrations...`
-      );
-      status.pendingMigrations.forEach((m) => console.log(`  - ${m}`));
+      console.log(`🔄 Running ${status.totalPending} migrations...`);
 
       // Execute migrations
       const executedMigrations = await this.dataSource.runMigrations({
@@ -130,10 +117,6 @@ export class AutoMigrationManager {
         migrations: executedNames,
       });
 
-      console.log(`\n✅ Successfully executed ${executedNames.length} migrations`);
-      executedNames.forEach((m) => console.log(`  ✓ ${m}`));
-      console.log('');
-
       return {
         success: true,
         executed: executedNames,
@@ -146,8 +129,7 @@ export class AutoMigrationManager {
         stack: err.stack,
       });
 
-      console.error('\n❌ Migration execution failed');
-      console.error(`Error: ${err.message}\n`);
+      console.error('❌ Migration failed:', err.message);
 
       return {
         success: false,

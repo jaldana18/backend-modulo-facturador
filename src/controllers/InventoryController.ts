@@ -215,6 +215,7 @@ export class InventoryController {
       companyId,
       userId,
       bulkDto.items,
+      bulkDto.warehouseId,
       bulkDto.reason,
       bulkDto.notes
     );
@@ -243,6 +244,7 @@ export class InventoryController {
       companyId,
       userId,
       bulkDto.items,
+      bulkDto.warehouseId,
       bulkDto.reason,
       bulkDto.notes
     );
@@ -395,6 +397,41 @@ export class InventoryController {
     const response: ApiResponse = {
       success: true,
       data: result,
+    };
+
+    res.json(response);
+  };
+
+  /**
+   * GET /api/v1/inventory/warehouses/summary
+   * Get inventory summary for all warehouses
+   */
+  getWarehousesSummary = async (req: Request, res: Response): Promise<void> => {
+    const companyId = req.user!.companyId;
+
+    const summaries = await this.inventoryService.getWarehousesSummary(companyId);
+
+    const response: ApiResponse = {
+      success: true,
+      data: summaries,
+    };
+
+    res.json(response);
+  };
+
+  /**
+   * GET /api/v1/inventory/warehouses/:warehouseId/summary
+   * Get inventory summary for a specific warehouse
+   */
+  getWarehouseSummary = async (req: Request, res: Response): Promise<void> => {
+    const companyId = req.user!.companyId;
+    const warehouseId = parseInt(req.params.warehouseId);
+
+    const summary = await this.inventoryService.getWarehouseSummary(companyId, warehouseId);
+
+    const response: ApiResponse = {
+      success: true,
+      data: summary,
     };
 
     res.json(response);

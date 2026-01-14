@@ -52,6 +52,7 @@ export class AuthService {
       companyId: user.companyId,
       email: user.email,
       role: user.role,
+      warehouseId: user.warehouseId, // Include warehouse for 'user' role
     };
 
     const accessToken = generateAccessToken(payload);
@@ -134,6 +135,7 @@ export class AuthService {
       companyId: user.companyId,
       email: user.email,
       role: user.role,
+      warehouseId: user.warehouseId, // Include warehouse for 'user' role
     };
 
     const newAccessToken = generateAccessToken(payload);
@@ -256,5 +258,33 @@ export class AuthService {
         },
       };
     });
+  }
+
+  /**
+   * Reset password using only email (no token required)
+   */
+  async resetPassword(email: string, newPassword: string) {
+    // Find user by email
+    const user = await this.userRepository.findOne({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new ApiError(404, 'USER_NOT_FOUND', 'User with this email not found');
+    }
+
+    // Hash new password
+    const hashedPassword = await hashPassword(newPassword);
+
+    // Update password and clear refresh token for security
+    user.passwordHash = hashedPassword;
+    user.refreshToken = null;
+    await this.userRepository.save(user);
+
+    loggers.logAuth('password_reset_success', user.id, user.email, true);
+
+    return {
+      message: 'Password reset successfully',
+    };
   }
 }

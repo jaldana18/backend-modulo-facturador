@@ -6,6 +6,9 @@ import { QueryProductsDto } from '../dto/product/query-products.dto';
 import { ApiError } from '../middleware/errorHandler.middleware';
 import { loggers } from '../config/logger';
 import { PaginatedResponse } from '../common.types';
+import { AppDataSource } from '../config/database';
+import { InventoryTransaction, TransactionType, TransactionReason } from '../entities/InventoryTransaction.entity';
+import { Warehouse } from '../entities/Warehouse.entity';
 
 export class ProductService {
   private productRepository = new ProductRepository();
@@ -62,6 +65,53 @@ export class ProductService {
 
     await this.productRepository.save(product);
 
+    // Create initial stock transaction if initialStock is provided
+    if (dto.initialStock && dto.initialStock > 0) {
+      let warehouseId = dto.warehouseId;
+
+      // If no warehouse specified, get the first active warehouse for the company
+      if (!warehouseId) {
+        const warehouseRepo = AppDataSource.getRepository(Warehouse);
+        const defaultWarehouse = await warehouseRepo.findOne({
+          where: { companyId, isActive: true },
+          order: { id: 'ASC' },
+        });
+
+        if (!defaultWarehouse) {
+          throw new ApiError(
+            400,
+            'NO_WAREHOUSE_FOUND',
+            'No active warehouse found. Please specify a warehouseId or create a warehouse first.'
+          );
+        }
+        warehouseId = defaultWarehouse.id;
+      }
+
+      // Create initial stock transaction
+      const inventoryRepo = AppDataSource.getRepository(InventoryTransaction);
+      const initialTransaction = inventoryRepo.create({
+        companyId,
+        productId: product.id,
+        warehouseId,
+        userId,
+        type: TransactionType.ADJUSTMENT,
+        reason: TransactionReason.INITIAL_STOCK,
+        quantity: dto.initialStock,
+        previousStock: 0,
+        newStock: dto.initialStock,
+        notes: 'Initial stock',
+      });
+
+      await inventoryRepo.save(initialTransaction);
+
+      loggers.logOperation('initial_stock_created', userId, companyId, {
+        productId: product.id,
+        sku: product.sku,
+        warehouseId,
+        quantity: dto.initialStock,
+      });
+    }
+
     loggers.logOperation('product_created', userId, companyId, {
       productId: product.id,
       sku: product.sku,
@@ -102,13 +152,61 @@ export class ProductService {
     if (dto.cost !== undefined) product.cost = dto.cost;
     if (dto.price !== undefined) product.price = dto.price;
     if (dto.isActive !== undefined) product.isActive = dto.isActive;
+    if (dto.imageUrl !== undefined) product.imageUrl = dto.imageUrl;
     if (dto.metadata !== undefined) {
       product.metadata = dto.metadata ? JSON.stringify(dto.metadata) : null;
     }
 
     await this.productRepository.save(product);
 
-    loggers.logOperation('product_updated', userId, companyId, {
+    // Create initial stock transaction if initialStock is provided
+    if (dto.initialStock && dto.initialStock > 0) {
+      let warehouseId = dto.warehouseId;
+
+      // If no warehouse specified, get the first active warehouse for the company
+      if (!warehouseId) {
+        const warehouseRepo = AppDataSource.getRepository(Warehouse);
+        const defaultWarehouse = await warehouseRepo.findOne({
+          where: { companyId, isActive: true },
+          order: { id: 'ASC' },
+        });
+
+        if (!defaultWarehouse) {
+          throw new ApiError(
+            400,
+            'NO_WAREHOUSE_FOUND',
+            'No active warehouse found. Please specify a warehouseId or create a warehouse first.'
+          );
+        }
+        warehouseId = defaultWarehouse.id;
+      }
+
+      // Create initial stock transaction
+      const inventoryRepo = AppDataSource.getRepository(InventoryTransaction);
+      const initialTransaction = inventoryRepo.create({
+        companyId,
+        productId: product.id,
+        warehouseId,
+        userId,
+        type: TransactionType.ADJUSTMENT,
+        reason: TransactionReason.INITIAL_STOCK,
+        quantity: dto.initialStock,
+        previousStock: 0,
+        newStock: dto.initialStock,
+        notes: 'Initial stock added during update',
+      });
+
+      await inventoryRepo.save(initialTransaction);
+
+      loggers.logOperation('initial_stock_created', userId, companyId, {
+        productId: product.id,
+        sku: product.sku,
+        warehouseId,
+        quantity: dto.initialStock,
+      });
+    }
+
+    loggers.logOperation('product_created', userId, companyId, {
       productId: product.id,
       sku: product.sku,
       changes: dto,

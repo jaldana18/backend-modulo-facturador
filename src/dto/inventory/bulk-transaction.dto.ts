@@ -41,6 +41,10 @@ export class BulkTransactionDto {
   @IsNotEmpty({ message: 'Items are required' })
   items: BulkTransactionItemDto[];
 
+  @IsInt({ message: 'Warehouse ID must be an integer' })
+  @IsNotEmpty({ message: 'Warehouse ID is required' })
+  warehouseId: number;
+
   @IsEnum(TransactionReason, { message: 'Invalid transaction reason' })
   @IsNotEmpty({ message: 'Transaction reason is required' })
   reason: TransactionReason;

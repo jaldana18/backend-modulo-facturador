@@ -2,6 +2,8 @@ import winston from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 import path from 'path';
 import { config } from './environment';
+import { ActivityLogService } from '../services/ActivityLogService';
+import { ActivityType } from '../entities/ActivityLog.entity';
 
 // Define log format
 const logFormat = winston.format.combine(
@@ -159,6 +161,46 @@ export const loggers = {
       severity,
       details,
     });
+  },
+
+  /**
+   * Log business activity (user action)
+   * This saves to both Winston logs and activity_logs table
+   */
+  logActivity: async (params: {
+    companyId: number;
+    userId: number;
+    activityType: ActivityType;
+    description: string;
+    entityType?: string;
+    entityId?: number;
+    entityName?: string;
+    metadata?: Record<string, unknown>;
+    ipAddress?: string;
+    userAgent?: string;
+  }) => {
+    // Log to Winston for technical logs
+    logger.info({
+      type: 'user_activity',
+      companyId: params.companyId,
+      userId: params.userId,
+      activityType: params.activityType,
+      description: params.description,
+      entityType: params.entityType,
+      entityId: params.entityId,
+    });
+
+    // Save to database for business activity tracking
+    try {
+      const activityLogService = new ActivityLogService();
+      await activityLogService.logActivity(params);
+    } catch (error) {
+      logger.error({
+        type: 'activity_log_error',
+        message: 'Failed to save activity to database',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
   },
 };
 

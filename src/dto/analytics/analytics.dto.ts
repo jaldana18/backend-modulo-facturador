@@ -279,3 +279,55 @@ export interface ExportResponseDto {
   expiresAt: string;
   fileSize: number;
 }
+
+// Warehouse Sales Report DTOs
+export class WarehouseSalesQueryDto {
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  warehouseId?: number;
+
+  @IsOptional()
+  @IsEnum(Granularity)
+  granularity?: Granularity = Granularity.DAY;
+
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  includeProducts?: boolean = false;
+}
+
+export interface WarehouseSalesDto {
+  warehouseId: number;
+  warehouseName: string;
+  warehouseCode: string;
+  totalSales: number;
+  totalTransactions: number;
+  totalQuantitySold: number;
+  avgTicket: number;
+  percentageOfTotal: number;
+  topProducts?: TopProductResponseDto[];
+  timeline?: TimelineDataPoint[];
+}
+
+export interface WarehouseSalesResponseDto {
+  warehouses: WarehouseSalesDto[];
+  summary: {
+    totalSales: number;
+    totalTransactions: number;
+    totalWarehouses: number;
+    avgSalesPerWarehouse: number;
+  };
+  period: {
+    startDate: string;
+    endDate: string;
+  };
+}

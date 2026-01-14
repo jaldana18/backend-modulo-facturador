@@ -212,3 +212,77 @@
  *       404:
  *         description: Product not found
  */
+
+/**
+ * @swagger
+ * /products/{id}/image:
+ *   post:
+ *     summary: Upload or replace product image
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Product ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 format: binary
+ *                 description: Product image file (jpg, png, gif, webp - max 5MB)
+ *     responses:
+ *       200:
+ *         description: Image uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/ApiResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         imageUrl:
+ *                           type: string
+ *                           description: Relative URL to the uploaded image
+ *                         filename:
+ *                           type: string
+ *                           description: Generated filename
+ *                         size:
+ *                           type: integer
+ *                           description: File size in bytes
+ *                         mimetype:
+ *                           type: string
+ *                           description: File MIME type
+ *       400:
+ *         description: Invalid file type or size
+ *       404:
+ *         description: Product not found
+ *   delete:
+ *     summary: Delete product image
+ *     tags: [Products]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: Product ID
+ *     responses:
+ *       200:
+ *         description: Image deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ApiResponse'
+ *       404:
+ *         description: Product not found or has no image
+ */
