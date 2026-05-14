@@ -71,10 +71,13 @@ export class PaymentService {
       throw new ApiError(400, 'SALE_CANCELLED', 'Cannot add payments to cancelled sales');
     }
 
-    // Validate payment method exists and is active
-    const paymentMethod = await this.paymentMethodRepository.findOne({
-      where: { id: dto.paymentMethodId, companyId, isActive: true },
-    });
+    // Validate payment method exists and is active (accepts both global and company-specific methods)
+    const paymentMethod = await this.paymentMethodRepository
+      .createQueryBuilder('pm')
+      .where('pm.id = :id', { id: dto.paymentMethodId })
+      .andWhere('(pm.companyId IS NULL OR pm.companyId = :companyId)', { companyId })
+      .andWhere('pm.isActive = :isActive', { isActive: true })
+      .getOne();
 
     if (!paymentMethod) {
       throw new ApiError(404, 'PAYMENT_METHOD_NOT_FOUND', 'Payment method not found or inactive');

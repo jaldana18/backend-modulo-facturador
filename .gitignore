@@ -48,3 +48,7 @@ temp/
 # Uploads (product images, etc.)
 uploads/
 !uploads/.gitkeep
+
+# Claude Code (sesiones locales, no compartir)
+.claude/
+claudedocs/

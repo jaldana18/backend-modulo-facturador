@@ -222,6 +222,7 @@ export class SaleService {
         referenceSaleId: dto.referenceSaleId || null,
         notes: dto.notes || null,
         metadata: dto.metadata ? JSON.stringify(dto.metadata) : null,
+        paidAmount: 0, // must be initialized so calculateTotals() can compute balance correctly
       });
 
       // Create details
@@ -247,14 +248,29 @@ export class SaleService {
         return saleDetail;
       });
 
-      sale.details = details;
-
-      // Calculate sale totals
+      // Calculate sale totals before saving
       sale.subtotal = details.reduce((sum, d) => sum + d.getSubtotal(), 0);
       sale.calculateTotals();
 
-      await manager.save(Sale, sale);
-      await manager.save(SaleDetail, details);
+      // Save sale first to get the IDENTITY id via SQL Server OUTPUT INSERTED
+      const savedSale = await manager.save(Sale, sale);
+      const saleId = savedSale.id ?? sale.id;
+
+      if (!saleId) {
+        throw new ApiError(500, 'SALE_ID_NOT_GENERATED', 'Sale ID was not generated after insert');
+      }
+
+      // Insert sale_details via raw SQL — TypeORM's ORM layer cannot resolve the FK
+      // when both @Column saleId and @ManyToOne sale reference the same column (SQL Server quirk)
+      for (const d of details) {
+        await manager.query(
+          `INSERT INTO sale_details (sale_id, product_id, description, quantity, unit_price, tax_percentage, discount_percentage, discount_amount, line_total, is_kit, metadata) VALUES (@0, @1, @2, @3, @4, @5, @6, @7, @8, @9, @10)`,
+          [saleId, d.productId, d.description, d.quantity, d.unitPrice, d.taxPercentage, d.discountPercentage, d.discountAmount, d.lineTotal, d.isKit, d.metadata]
+        );
+      }
+
+      sale.id = saleId;
+      sale.details = details;
 
       loggers.logOperation('sale_created', userId, companyId, {
         saleId: sale.id,
